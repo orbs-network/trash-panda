@@ -6,6 +6,15 @@ import (
 	"github.com/orbs-network/trash-panda/boostrap/httpserver"
 )
 
+const (
+	SEND_TRANSACTION              = "/api/v1/send-transaction"
+	SEND_TRANSACTION_ASYNC        = "/api/v1/send-transaction-async"
+	RUN_QUERY                     = "/api/v1/run-query"
+	GET_TRANSACTION_STATUS        = "/api/v1/get-transaction-status"
+	GET_TRANSACTION_RECEIPT_PROOF = "/api/v1/get-transaction-receipt-proof"
+	GET_BLOCK                     = "/api/v1/get-block"
+)
+
 type Service struct {
 	logger log.Logger
 	config Config
@@ -28,10 +37,11 @@ func (s *Service) getPath(path string) string {
 }
 
 func (s *Service) UpdateRoutes(server *httpserver.HttpServer) {
-	server.RegisterHttpHandler(server.Router(), s.getPath("/api/v1/send-transaction"), true, s.sendTransactionHandler)
-	server.RegisterHttpHandler(server.Router(), s.getPath("/api/v1/send-transaction-async"), true, s.sendTransactionAsyncHandler)
-	server.RegisterHttpHandler(server.Router(), s.getPath("/api/v1/run-query"), true, s.runQueryHandler)
-	server.RegisterHttpHandler(server.Router(), s.getPath("/api/v1/get-transaction-status"), true, s.getTransactionStatusHandler)
-	server.RegisterHttpHandler(server.Router(), s.getPath("/api/v1/get-transaction-receipt-proof"), true, s.getTransactionReceiptProofHandler)
-	server.RegisterHttpHandler(server.Router(), s.getPath("/api/v1/get-block"), true, s.getBlockHandler)
+
+	server.RegisterHttpHandler(server.Router(), s.getPath(SEND_TRANSACTION), true, s.sendTransactionHandler)
+	server.RegisterHttpHandler(server.Router(), s.getPath(SEND_TRANSACTION_ASYNC), true, s.sendTransactionAsyncHandler)
+	server.RegisterHttpHandler(server.Router(), s.getPath(RUN_QUERY), true, s.runQueryHandler)
+	server.RegisterHttpHandler(server.Router(), s.getPath(GET_TRANSACTION_STATUS), true, s.getTransactionStatusHandler)
+	server.RegisterHttpHandler(server.Router(), s.getPath(GET_TRANSACTION_RECEIPT_PROOF), true, s.getTransactionReceiptProofHandler)
+	server.RegisterHttpHandler(server.Router(), s.getPath(GET_BLOCK), true, s.getBlockHandler)
 }

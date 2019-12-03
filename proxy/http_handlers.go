@@ -57,7 +57,7 @@ func (s *Service) runQueryHandler(w http.ResponseWriter, r *http.Request) {
 
 	s.logger.Info("http HttpServer received run-query", log.Stringable("request", clientRequest))
 
-	res, resBody, err := sendHttpPost(s.config.Endpoints[0]+"/api/v1/run-query", bytes)
+	res, resBody, err := sendHttpPost(s.config.Endpoints[0]+RUN_QUERY, bytes)
 	if err != nil {
 		s.logger.Error(err.Error())
 	}
