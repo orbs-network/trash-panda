@@ -7,7 +7,7 @@ import (
 
 func GetLogger() log.Logger {
 	logger := log.GetLogger().
-		WithTags(log.String("app", "signer")).
+		WithTags(log.String("app", "trash-panda")).
 		WithOutput(log.NewFormattingOutput(os.Stdout, log.NewHumanReadableFormatter()))
 
 	return logger

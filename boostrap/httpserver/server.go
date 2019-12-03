@@ -12,12 +12,10 @@ import (
 	"github.com/orbs-network/govnr"
 	"github.com/orbs-network/membuffers/go"
 	"github.com/orbs-network/trash-panda/config"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"time"
 
-	"github.com/orbs-network/orbs-spec/types/go/protocol"
 	"github.com/orbs-network/scribe/log"
 )
 
@@ -35,7 +33,7 @@ type HttpServer struct {
 	router     *http.ServeMux
 
 	logger log.Logger
-	config *ServerConfig
+	config HttpServerConfig
 
 	port int
 }
@@ -60,7 +58,7 @@ func (ln TcpKeepAliveListener) Accept() (net.Conn, error) {
 	return tc, nil
 }
 
-func NewHttpServer(ctx context.Context, cfg *ServerConfig, logger log.Logger) *HttpServer {
+func NewHttpServer(ctx context.Context, cfg HttpServerConfig, logger log.Logger) *HttpServer {
 	server := &HttpServer{
 		logger: logger.WithTags(LogTag),
 		config: cfg,
@@ -125,7 +123,7 @@ func wrapHandlerWithCORS(f func(w http.ResponseWriter, r *http.Request)) func(w 
 	}
 }
 
-func (s *HttpServer) registerHttpHandler(router *http.ServeMux, urlPath string, withCORS bool, handler http.HandlerFunc) {
+func (s *HttpServer) RegisterHttpHandler(router *http.ServeMux, urlPath string, withCORS bool, handler http.HandlerFunc) {
 	if withCORS {
 		handler = wrapHandlerWithCORS(handler)
 	}
@@ -136,56 +134,10 @@ func (s *HttpServer) registerHttpHandler(router *http.ServeMux, urlPath string, 
 func (s *HttpServer) createRouter() *http.ServeMux {
 	router := http.NewServeMux()
 
-	s.registerHttpHandler(router, "/api/v1/send-transaction", true, s.sendTransactionHandler)
-	s.registerHttpHandler(router, "/api/v1/send-transaction-async", true, s.sendTransactionAsyncHandler)
-	s.registerHttpHandler(router, "/api/v1/run-query", true, s.runQueryHandler)
-	s.registerHttpHandler(router, "/api/v1/get-transaction-status", true, s.getTransactionStatusHandler)
-	s.registerHttpHandler(router, "/api/v1/get-transaction-receipt-proof", true, s.getTransactionReceiptProofHandler)
-	s.registerHttpHandler(router, "/api/v1/get-block", true, s.getBlockHandler)
-	s.registerHttpHandler(router, "/robots.txt", false, s.robots)
-
+	s.RegisterHttpHandler(router, "/robots.txt", false, s.robots)
 	router.Handle("/", http.HandlerFunc(wrapHandlerWithCORS(s.Index)))
 
 	return router
-}
-
-func readInput(r *http.Request) ([]byte, *httpErr) {
-	if r.Body == nil {
-		return nil, &httpErr{http.StatusBadRequest, nil, "http request body is empty"}
-	}
-
-	bytes, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return nil, &httpErr{http.StatusBadRequest, log.Error(err), "http request body is empty"}
-	}
-	return bytes, nil
-}
-
-func validate(m membuffers.Message) *httpErr {
-	if !m.IsValid() {
-		return &httpErr{http.StatusBadRequest, log.Stringable("request", m), "http request is not a valid membuffer"}
-	}
-	return nil
-}
-
-func translateRequestStatusToHttpCode(responseCode protocol.RequestStatus) int {
-	switch responseCode {
-	case protocol.REQUEST_STATUS_COMPLETED:
-		return http.StatusOK
-	case protocol.REQUEST_STATUS_IN_PROCESS:
-		return http.StatusAccepted
-	case protocol.REQUEST_STATUS_BAD_REQUEST:
-		return http.StatusBadRequest
-	case protocol.REQUEST_STATUS_CONGESTION:
-		return http.StatusServiceUnavailable
-	case protocol.REQUEST_STATUS_SYSTEM_ERROR:
-		return http.StatusInternalServerError
-	case protocol.REQUEST_STATUS_OUT_OF_SYNC:
-		return http.StatusServiceUnavailable
-	case protocol.REQUEST_STATUS_RESERVED:
-		return http.StatusInternalServerError
-	}
-	return http.StatusNotImplemented
 }
 
 func (s *HttpServer) writeMembuffResponse(w http.ResponseWriter, message membuffers.Message, httpCode int, errorForVerbosity error) {
@@ -214,4 +166,3 @@ func (s *HttpServer) writeErrorResponseAndLog(w http.ResponseWriter, m *httpErr)
 		s.logger.Info("error writing response", log.Error(err))
 	}
 }
-

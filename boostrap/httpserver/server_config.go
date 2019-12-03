@@ -6,22 +6,20 @@
 
 package httpserver
 
-type ServerConfig struct {
-	httpAddress string
-	profiling   bool
+type HttpServerConfig interface {
+	HttpAddress() string
 }
 
-func NewServerConfig(httpAddress string, profiling bool) *ServerConfig {
+type ServerConfig struct {
+	httpAddress string
+}
+
+func NewServerConfig(httpAddress string) HttpServerConfig {
 	return &ServerConfig{
 		httpAddress: httpAddress,
-		profiling:   profiling,
 	}
 }
 
 func (c *ServerConfig) HttpAddress() string {
 	return c.httpAddress
-}
-
-func (c *ServerConfig) Profiling() bool {
-	return c.profiling
 }
