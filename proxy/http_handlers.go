@@ -30,7 +30,7 @@ func (s *Service) sendTransactionHandler(w http.ResponseWriter, r *http.Request)
 	if result.IsValid() {
 		s.writeMembuffResponse(w, result, res.StatusCode, err)
 	} else {
-		s.writeErrorResponseAndLog(w, &httpErr{http.StatusInternalServerError, log.Error(err), err.Error()})
+		s.writeErrorResponseAndLog(w, &HttpErr{http.StatusInternalServerError, log.Error(err), err.Error()})
 	}
 }
 
@@ -76,7 +76,7 @@ func (s *Service) runQueryHandler(w http.ResponseWriter, r *http.Request) {
 	if result.IsValid() {
 		s.writeMembuffResponse(w, result, res.StatusCode, err)
 	} else {
-		s.writeErrorResponseAndLog(w, &httpErr{http.StatusInternalServerError, log.Error(err), err.Error()})
+		s.writeErrorResponseAndLog(w, &HttpErr{http.StatusInternalServerError, log.Error(err), err.Error()})
 	}
 }
 

@@ -7,10 +7,10 @@ import (
 	"net/http"
 )
 
-type httpErr struct {
-	code     int
-	logField *log.Field
-	message  string
+type HttpErr struct {
+	Code     int
+	LogField *log.Field
+	Message  string
 }
 
 func (s *Service) writeMembuffResponse(w http.ResponseWriter, message membuffers.Message, httpCode int, errorForVerbosity error) {
@@ -26,35 +26,35 @@ func (s *Service) writeMembuffResponse(w http.ResponseWriter, message membuffers
 	}
 }
 
-func (s *Service) writeErrorResponseAndLog(w http.ResponseWriter, m *httpErr) {
-	if m.logField == nil {
-		s.logger.Info(m.message)
+func (s *Service) writeErrorResponseAndLog(w http.ResponseWriter, m *HttpErr) {
+	if m.LogField == nil {
+		s.logger.Info(m.Message)
 	} else {
-		s.logger.Info(m.message, m.logField)
+		s.logger.Info(m.Message, m.LogField)
 	}
 	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(m.code)
-	_, err := w.Write([]byte(m.message))
+	w.WriteHeader(m.Code)
+	_, err := w.Write([]byte(m.Message))
 	if err != nil {
 		s.logger.Info("error writing response", log.Error(err))
 	}
 }
 
-func readInput(r *http.Request) ([]byte, *httpErr) {
+func readInput(r *http.Request) ([]byte, *HttpErr) {
 	if r.Body == nil {
-		return nil, &httpErr{http.StatusBadRequest, nil, "http request body is empty"}
+		return nil, &HttpErr{http.StatusBadRequest, nil, "http request body is empty"}
 	}
 
 	bytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return nil, &httpErr{http.StatusBadRequest, log.Error(err), "http request body is empty"}
+		return nil, &HttpErr{http.StatusBadRequest, log.Error(err), "http request body is empty"}
 	}
 	return bytes, nil
 }
 
-func validate(m membuffers.Message) *httpErr {
+func validate(m membuffers.Message) *HttpErr {
 	if !m.IsValid() {
-		return &httpErr{http.StatusBadRequest, log.Stringable("request", m), "http request is not a valid membuffer"}
+		return &HttpErr{http.StatusBadRequest, log.Stringable("request", m), "http request is not a valid membuffer"}
 	}
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/orbs-network/trash-panda/boostrap/httpserver"
 	"github.com/orbs-network/trash-panda/config"
 	"github.com/orbs-network/trash-panda/proxy"
+	"github.com/orbs-network/trash-panda/proxy/adapter/transparent"
 )
 
 func NewTrashPanda(ctx context.Context, ids ...uint32) {
@@ -13,9 +14,11 @@ func NewTrashPanda(ctx context.Context, ids ...uint32) {
 	server := httpserver.NewHttpServer(ctx, httpConfig, logger)
 
 	for _, id := range ids {
-		proxy.NewService(proxy.Config{
+		cfg := proxy.Config{
 			VirtualChainId: id,
 			Endpoints:      []string{"http://localhost:8080"},
-		}, logger).UpdateRoutes(server)
+		}
+
+		proxy.NewService(cfg, transparent.NewTransparentAdapter(cfg), logger).UpdateRoutes(server)
 	}
 }
