@@ -21,3 +21,18 @@ func Test_RunQuery(t *testing.T) {
 	})
 
 }
+
+func Test_SendTransaction(t *testing.T) {
+	contractTest(t, func(t *testing.T, endpoint string, vcid uint32) {
+		account, _ := orbs.CreateAccount()
+		client := orbs.NewClient(endpoint, vcid, codec.NETWORK_TYPE_TEST_NET)
+
+		query, _, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, "_Info", "isAlive")
+		require.NoError(t, err)
+
+		res, err := client.SendTransaction(query)
+		require.NoError(t, err)
+		require.EqualValues(t, res.ExecutionResult, codec.EXECUTION_RESULT_SUCCESS)
+	})
+
+}

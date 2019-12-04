@@ -37,7 +37,6 @@ func (s *Service) getPath(path string) string {
 }
 
 func (s *Service) UpdateRoutes(server *httpserver.HttpServer) {
-
 	server.RegisterHttpHandler(server.Router(), s.getPath(SEND_TRANSACTION), true, s.sendTransactionHandler)
 	server.RegisterHttpHandler(server.Router(), s.getPath(SEND_TRANSACTION_ASYNC), true, s.sendTransactionAsyncHandler)
 	server.RegisterHttpHandler(server.Router(), s.getPath(RUN_QUERY), true, s.runQueryHandler)

@@ -21,7 +21,17 @@ func (s *Service) sendTransactionHandler(w http.ResponseWriter, r *http.Request)
 
 	s.logger.Info("http HttpServer received send-transaction", log.Stringable("request", clientRequest))
 
-	panic("not implemented")
+	res, resBody, err := sendHttpPost(s.config.Endpoints[0]+SEND_TRANSACTION, bytes)
+	if err != nil {
+		s.logger.Error(err.Error())
+	}
+
+	result := client.SendTransactionResponseReader(resBody)
+	if result.IsValid() {
+		s.writeMembuffResponse(w, result, res.StatusCode, err)
+	} else {
+		s.writeErrorResponseAndLog(w, &httpErr{http.StatusInternalServerError, log.Error(err), err.Error()})
+	}
 }
 
 func (s *Service) sendTransactionAsyncHandler(w http.ResponseWriter, r *http.Request) {
