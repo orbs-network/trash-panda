@@ -51,34 +51,3 @@ func readInput(r *http.Request) ([]byte, *HttpErr) {
 	}
 	return bytes, nil
 }
-
-func validate(m membuffers.Message) *HttpErr {
-	if !m.IsValid() {
-		return &HttpErr{http.StatusBadRequest, log.Stringable("request", m), "http request is not a valid membuffer"}
-	}
-	return nil
-}
-
-var HEADERS = []string{
-	"Content-Type",
-	"X-ORBS-REQUEST-RESULT",
-	"X-ORBS-BLOCK-HEIGHT",
-	"X-ORBS-BLOCK-TIMESTAMP",
-	"X-ORBS-ERROR-DETAILS",
-}
-
-func copyResponse(w http.ResponseWriter, res *http.Response, responseBody []byte) {
-	w.WriteHeader(res.StatusCode)
-	w.Write(responseBody)
-
-	for _, header := range HEADERS {
-		println(header, res.Header.Get(header))
-		w.Header().Set(header, res.Header.Get(header))
-	}
-	w.Header().Write(w)
-
-	println("====")
-	for _, header := range HEADERS {
-		println(header, w.Header().Get(header))
-	}
-}
