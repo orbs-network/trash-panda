@@ -7,22 +7,20 @@ import (
 	"net/http"
 )
 
-func runQuery(h *handler, input []byte) (membuffers.Message, *proxy.HttpErr) {
-	clientRequest := client.RunQueryRequestReader(input)
-	if e := validate(clientRequest); e != nil {
-		return nil, e
+func runQuery(h *handler, data []byte) (input membuffers.Message, output membuffers.Message, err *proxy.HttpErr) {
+	input = client.RunQueryRequestReader(data)
+	if e := validate(input); e != nil {
+		return nil, nil, e
 	}
 
-	//h.logger.Info("http HttpServer received run-query", log.Stringable("request", clientRequest))
-
-	res, resBody, err := sendHttpPost(h.config.Endpoints[0]+h.path, input)
-	if err != nil {
-		return nil, &proxy.HttpErr{http.StatusBadRequest, nil, err.Error()}
+	res, resBody, e := sendHttpPost(h.config.Endpoints[0]+h.path, data)
+	if e != nil {
+		return input, nil, &proxy.HttpErr{http.StatusBadRequest, nil, e.Error()}
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return nil, &proxy.HttpErr{res.StatusCode, nil, res.Header.Get("X-ORBS-ERROR-DETAILS")}
+		return input, nil, &proxy.HttpErr{res.StatusCode, nil, res.Header.Get("X-ORBS-ERROR-DETAILS")}
 	}
 
-	return client.RunQueryResponseReader(resBody), nil
+	return input, client.RunQueryResponseReader(resBody), nil
 }

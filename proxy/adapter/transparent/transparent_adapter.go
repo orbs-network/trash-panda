@@ -11,15 +11,14 @@ type adapter struct {
 	handlers []proxy.Handler
 }
 
-type builderFunc func(h *handler, input []byte) (message membuffers.Message, err *proxy.HttpErr)
+type builderFunc func(h *handler, data []byte) (input membuffers.Message, output membuffers.Message, err *proxy.HttpErr)
 
 type handler struct {
 	name   string
 	path   string
 	config proxy.Config
 
-	f        builderFunc
-	callback proxy.HandlerCallback
+	f builderFunc
 }
 
 func NewTransparentAdapter(config proxy.Config) proxy.ProxyAdapter {
@@ -60,17 +59,9 @@ func (h *handler) Path() string {
 }
 
 func (h *handler) Handler() proxy.HandlerBuilderFunc {
-	return func(input []byte) (message membuffers.Message, err *proxy.HttpErr) {
-		message, err = h.f(h, input)
-		if message != nil && h.callback != nil {
-			h.callback(message)
-		}
-		return
+	return func(data []byte) (input membuffers.Message, output membuffers.Message, err *proxy.HttpErr) {
+		return h.f(h, data)
 	}
-}
-
-func (h *handler) SetCallback(callback proxy.HandlerCallback) {
-	h.callback = callback
 }
 
 func validate(m membuffers.Message) *proxy.HttpErr {

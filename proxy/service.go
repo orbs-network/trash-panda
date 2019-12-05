@@ -33,7 +33,6 @@ func NewService(cfg Config, adapter ProxyAdapter, logger log.Logger) *Service {
 
 func (s *Service) UpdateRoutes(server *httpserver.HttpServer) {
 	for _, h := range s.adapter.Handlers() {
-		//h.SetCallback(s.txCollectionCallback)
 		server.RegisterHttpHandler(server.Router(), s.getPath(h.Path()), true, s.wrapHandler(h.Handler()))
 	}
 }
@@ -66,11 +65,15 @@ func (s *Service) wrapHandler(handlerBuilder HandlerBuilderFunc) http.HandlerFun
 			s.writeErrorResponseAndLog(w, e)
 			return
 		}
-		result, err := handlerBuilder(bytes)
+		input, output, err := handlerBuilder(bytes)
+
+		s.logger.Info("received request", log.Stringable("request", input))
 		if err != nil {
+			s.logger.Error("error occurred", err.LogField)
 			s.writeErrorResponseAndLog(w, err)
 		} else {
-			s.writeMembuffResponse(w, result, 200, nil)
+			s.logger.Info("responded with", log.Stringable("response", output))
+			s.writeMembuffResponse(w, output, 200, nil)
 		}
 	}
 }

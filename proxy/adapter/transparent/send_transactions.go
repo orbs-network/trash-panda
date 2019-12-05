@@ -7,20 +7,20 @@ import (
 	"net/http"
 )
 
-func sendTransaction(h *handler, input []byte) (membuffers.Message, *proxy.HttpErr) {
-	clientRequest := client.SendTransactionRequestReader(input)
-	if e := validate(clientRequest); e != nil {
-		return nil, e
+func sendTransaction(h *handler, data []byte) (input membuffers.Message, output membuffers.Message, err *proxy.HttpErr) {
+	input = client.SendTransactionRequestReader(data)
+	if e := validate(input); e != nil {
+		return nil, nil, e
 	}
 
-	res, resBody, err := sendHttpPost(h.config.Endpoints[0]+h.path, input)
+	res, resBody, e := sendHttpPost(h.config.Endpoints[0]+h.path, data)
 	if err != nil {
-		return nil, &proxy.HttpErr{http.StatusBadRequest, nil, err.Error()}
+		return input, nil, &proxy.HttpErr{http.StatusBadRequest, nil, e.Error()}
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return nil, &proxy.HttpErr{res.StatusCode, nil, res.Header.Get("X-ORBS-ERROR-DETAILS")}
+		return input, nil, &proxy.HttpErr{res.StatusCode, nil, res.Header.Get("X-ORBS-ERROR-DETAILS")}
 	}
 
-	return client.SendTransactionResponseReader(resBody), nil
+	return input, client.SendTransactionResponseReader(resBody), nil
 }

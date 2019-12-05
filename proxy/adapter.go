@@ -2,14 +2,12 @@ package proxy
 
 import "github.com/orbs-network/membuffers/go"
 
-type HandlerBuilderFunc func(input []byte) (message membuffers.Message, err *HttpErr)
-type HandlerCallback func(message membuffers.Message)
+type HandlerBuilderFunc func(data []byte) (input membuffers.Message, output membuffers.Message, err *HttpErr)
 
 type Handler interface {
 	Name() string
 	Path() string
 	Handler() HandlerBuilderFunc
-	SetCallback(callback HandlerCallback)
 }
 
 type ProxyAdapter interface {
