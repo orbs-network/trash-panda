@@ -18,7 +18,8 @@ type handler struct {
 	path   string
 	config proxy.Config
 
-	f builderFunc
+	f        builderFunc
+	callback proxy.HandlerCallback
 }
 
 func NewTransparentAdapter(config proxy.Config) proxy.ProxyAdapter {
@@ -31,16 +32,16 @@ func NewTransparentAdapter(config proxy.Config) proxy.ProxyAdapter {
 	return &adapter{
 		[]proxy.Handler{
 			&handler{
-				"run-query",
-				"/api/v1/run-query",
-				config,
-				runQuery,
+				name:   "run-query",
+				path:   "/api/v1/run-query",
+				config: config,
+				f:      runQuery,
 			},
 			&handler{
-				"send-transaction",
-				"/api/v1/send-transaction",
-				config,
-				sendTransaction,
+				name:   "send-transaction",
+				path:   "/api/v1/send-transaction",
+				config: config,
+				f:      sendTransaction,
 			},
 		},
 	}
@@ -60,8 +61,16 @@ func (h *handler) Path() string {
 
 func (h *handler) Handler() proxy.HandlerBuilderFunc {
 	return func(input []byte) (message membuffers.Message, err *proxy.HttpErr) {
-		return h.f(h, input)
+		message, err = h.f(h, input)
+		if message != nil && h.callback != nil {
+			h.callback(message)
+		}
+		return
 	}
+}
+
+func (h *handler) SetCallback(callback proxy.HandlerCallback) {
+	h.callback = callback
 }
 
 func validate(m membuffers.Message) *proxy.HttpErr {

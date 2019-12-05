@@ -1,7 +1,9 @@
 package proxy
 
 import (
+	"context"
 	"fmt"
+	"github.com/orbs-network/membuffers/go"
 	"github.com/orbs-network/scribe/log"
 	"github.com/orbs-network/trash-panda/boostrap/httpserver"
 	"net/http"
@@ -11,6 +13,8 @@ type Service struct {
 	logger  log.Logger
 	config  Config
 	adapter ProxyAdapter
+
+	queue chan membuffers.Message
 }
 
 type Config struct {
@@ -23,17 +27,36 @@ func NewService(cfg Config, adapter ProxyAdapter, logger log.Logger) *Service {
 		config:  cfg,
 		logger:  logger,
 		adapter: adapter,
+		queue:   make(chan membuffers.Message),
 	}
-}
-
-func (s *Service) getPath(path string) string {
-	return fmt.Sprintf("/vchains/%d%s", s.config.VirtualChainId, path)
 }
 
 func (s *Service) UpdateRoutes(server *httpserver.HttpServer) {
 	for _, h := range s.adapter.Handlers() {
+		//h.SetCallback(s.txCollectionCallback)
 		server.RegisterHttpHandler(server.Router(), s.getPath(h.Path()), true, s.wrapHandler(h.Handler()))
 	}
+}
+
+func (s *Service) ResendTxQueue(ctx context.Context) {
+	for {
+		select {
+		case message := <-s.queue:
+			s.logger.Info("received callback", log.Stringable("message", message))
+		case <-ctx.Done():
+			close(s.queue)
+			s.logger.Info("shutting down")
+			return
+		}
+	}
+}
+
+func (s *Service) txCollectionCallback(message membuffers.Message) {
+	s.queue <- message
+}
+
+func (s *Service) getPath(path string) string {
+	return fmt.Sprintf("/vchains/%d%s", s.config.VirtualChainId, path)
 }
 
 func (s *Service) wrapHandler(handlerBuilder HandlerBuilderFunc) http.HandlerFunc {
