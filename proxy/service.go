@@ -7,15 +7,6 @@ import (
 	"net/http"
 )
 
-const (
-	SEND_TRANSACTION              = "/api/v1/send-transaction"
-	SEND_TRANSACTION_ASYNC        = "/api/v1/send-transaction-async"
-	RUN_QUERY                     = "/api/v1/run-query"
-	GET_TRANSACTION_STATUS        = "/api/v1/get-transaction-status"
-	GET_TRANSACTION_RECEIPT_PROOF = "/api/v1/get-transaction-receipt-proof"
-	GET_BLOCK                     = "/api/v1/get-block"
-)
-
 type Service struct {
 	logger  log.Logger
 	config  Config

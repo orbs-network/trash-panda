@@ -2,20 +2,12 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"github.com/orbs-network/trash-panda/boostrap"
-	"os"
+	"github.com/orbs-network/trash-panda/proxy/adapter/transparent"
+	"math/rand"
 	"testing"
 )
-
-func GetEndpoint() (endpoint string) {
-	endpoint = "http://localhost:8080"
-
-	if endpointFromEnv := os.Getenv("ENDPOINT"); endpointFromEnv != "" {
-		endpoint = endpointFromEnv
-	}
-
-	return
-}
 
 func contractTest(t *testing.T, f func(t *testing.T, endpoint string, vcid uint32)) {
 	t.Run("gamma", func(t *testing.T) {
@@ -26,7 +18,9 @@ func contractTest(t *testing.T, f func(t *testing.T, endpoint string, vcid uint3
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		boostrap.NewTrashPanda(ctx, 42)
-		f(t, "http://localhost:9876/vchains/42", 42)
+		httpAddress := fmt.Sprintf("localhost:%d", rand.Intn(63000))
+		endpoint := fmt.Sprintf("http://%s/vchains/42", httpAddress)
+		boostrap.NewTrashPanda(ctx, transparent.NewTransparentAdapter, httpAddress, 42)
+		f(t, endpoint, 42)
 	})
 }
