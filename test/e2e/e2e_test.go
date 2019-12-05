@@ -27,12 +27,14 @@ func Test_SendTransaction(t *testing.T) {
 		account, _ := orbs.CreateAccount()
 		client := orbs.NewClient(endpoint, vcid, codec.NETWORK_TYPE_TEST_NET)
 
-		query, _, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, "_Info", "isAlive")
+		contractName := deployIncrementContractToGamma(t)
+
+		query, _, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc")
 		require.NoError(t, err)
 
 		res, err := client.SendTransaction(query)
 		require.NoError(t, err)
 		require.EqualValues(t, res.ExecutionResult, codec.EXECUTION_RESULT_SUCCESS)
+		require.EqualValues(t, uint64(1), res.OutputArguments[0].(uint64))
 	})
-
 }

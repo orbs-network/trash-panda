@@ -18,6 +18,8 @@ func NewTrashPanda(ctx context.Context, adapterFactory func(proxy.Config) proxy.
 			Endpoints:      []string{"http://localhost:8080"},
 		}
 
-		proxy.NewService(cfg, adapterFactory(cfg), logger).UpdateRoutes(server)
+		p := proxy.NewService(cfg, adapterFactory(cfg), logger)
+		p.UpdateRoutes(server)
+		p.ResendTxQueue(ctx)
 	}
 }

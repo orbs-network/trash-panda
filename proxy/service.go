@@ -38,16 +38,18 @@ func (s *Service) UpdateRoutes(server *httpserver.HttpServer) {
 }
 
 func (s *Service) ResendTxQueue(ctx context.Context) {
-	for {
-		select {
-		case message := <-s.queue:
-			s.logger.Info("received callback", log.Stringable("message", message))
-		case <-ctx.Done():
-			close(s.queue)
-			s.logger.Info("shutting down")
-			return
+	go func() {
+		for {
+			select {
+			case message := <-s.queue:
+				s.logger.Info("received callback", log.Stringable("message", message))
+			case <-ctx.Done():
+				close(s.queue)
+				s.logger.Info("shutting down")
+				return
+			}
 		}
-	}
+	}()
 }
 
 func (s *Service) txCollectionCallback(message membuffers.Message) {
@@ -68,6 +70,8 @@ func (s *Service) wrapHandler(handlerBuilder HandlerBuilderFunc) http.HandlerFun
 		input, output, err := handlerBuilder(bytes)
 
 		s.logger.Info("received request", log.Stringable("request", input))
+		s.txCollectionCallback(input)
+
 		if err != nil {
 			s.logger.Error("error occurred", err.LogField)
 			s.writeErrorResponseAndLog(w, err)
