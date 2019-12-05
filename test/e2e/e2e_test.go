@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"github.com/orbs-network/orbs-client-sdk-go/codec"
 	"github.com/orbs-network/orbs-client-sdk-go/orbs"
 	"github.com/stretchr/testify/require"
@@ -29,12 +30,40 @@ func Test_SendTransaction(t *testing.T) {
 
 		contractName := deployIncrementContractToGamma(t)
 
-		query, _, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc")
+		tx, txId, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc")
 		require.NoError(t, err)
 
-		res, err := client.SendTransaction(query)
+		res, err := client.SendTransaction(tx)
 		require.NoError(t, err)
 		require.EqualValues(t, res.ExecutionResult, codec.EXECUTION_RESULT_SUCCESS)
 		require.EqualValues(t, uint64(1), res.OutputArguments[0].(uint64))
+
+		txStatus, err := client.GetTransactionStatus(txId)
+		require.NoError(t, err)
+		require.EqualValues(t, codec.TRANSACTION_STATUS_COMMITTED, txStatus.TransactionStatus)
 	})
+}
+
+func Test_Relay(t *testing.T) {
+	contractName := deployIncrementContractToGamma(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	endpoint := getTrashPandaEndpoint(ctx)
+
+	account, _ := orbs.CreateAccount()
+	client := orbs.NewClient(endpoint, GAMMA_VCHAIN, codec.NETWORK_TYPE_TEST_NET)
+
+	tx, txId, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc")
+	require.NoError(t, err)
+
+	_, err = client.SendTransaction(tx)
+	require.NoError(t, err)
+	//require.EqualValues(t, res.ExecutionResult, codec.EXECUTION_RESULT_SUCCESS)
+	//require.EqualValues(t, uint64(1), res.OutputArguments[0].(uint64))
+
+	txStatus, err := client.GetTransactionStatus(txId)
+	require.NoError(t, err)
+	require.EqualValues(t, codec.TRANSACTION_STATUS_COMMITTED, txStatus.TransactionStatus)
 }

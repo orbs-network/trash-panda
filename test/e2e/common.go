@@ -25,11 +25,16 @@ func contractTest(t *testing.T, f func(t *testing.T, endpoint string, vcid uint3
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		httpAddress := fmt.Sprintf("localhost:%d", rand.Intn(63000))
-		endpoint := fmt.Sprintf("http://%s/vchains/42", httpAddress)
-		boostrap.NewTrashPanda(ctx, transparent.NewTransparentAdapter, httpAddress, 42)
+		endpoint := getTrashPandaEndpoint(ctx)
 		f(t, endpoint, GAMMA_VCHAIN)
 	})
+}
+
+func getTrashPandaEndpoint(ctx context.Context) string {
+	httpAddress := fmt.Sprintf("localhost:%d", rand.Intn(63000))
+	endpoint := fmt.Sprintf("http://%s/vchains/42", httpAddress)
+	boostrap.NewTrashPanda(ctx, transparent.NewTransparentAdapter, httpAddress, 42)
+	return endpoint
 }
 
 func deployIncrementContractToGamma(t *testing.T) (contractName string) {

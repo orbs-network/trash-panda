@@ -42,6 +42,12 @@ func NewTransparentAdapter(config proxy.Config) proxy.ProxyAdapter {
 				config: config,
 				f:      sendTransaction,
 			},
+			&handler{
+				name:   "get-transaction-status",
+				path:   "/api/v1/get-transaction-status",
+				config: config,
+				f:      getTransactionStatus,
+			},
 		},
 	}
 }
