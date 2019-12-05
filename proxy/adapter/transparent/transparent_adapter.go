@@ -64,9 +64,24 @@ func (h *handler) Path() string {
 	return h.path
 }
 
+type container struct {
+	input  membuffers.Message
+	output membuffers.Message
+	err    *proxy.HttpErr
+}
+
 func (h *handler) Handler() proxy.HandlerBuilderFunc {
 	return func(data []byte) (input membuffers.Message, output membuffers.Message, err *proxy.HttpErr) {
-		return h.f(h, data)
+		result := make(chan container)
+
+		// FIXME this is very ugly
+		go func() {
+			i, o, e := h.f(h, data)
+			result <- container{i, o, e}
+		}()
+
+		r := <-result
+		return r.input, r.output, r.err
 	}
 }
 

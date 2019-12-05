@@ -9,6 +9,10 @@ import (
 	"github.com/orbs-network/trash-panda/proxy/adapter/transparent"
 	"github.com/stretchr/testify/require"
 	"math/rand"
+	"os/exec"
+
+	//"os"
+	//"os/exec"
 	"testing"
 	"time"
 )
@@ -53,4 +57,13 @@ func deployIncrementContractToGamma(t *testing.T) (contractName string) {
 	require.EqualValues(t, res.ExecutionResult, codec.EXECUTION_RESULT_SUCCESS)
 
 	return
+}
+
+func pauseGamma(t *testing.T) {
+	out, err := exec.Command("docker", "pause", "orbs-gamma-server").CombinedOutput()
+	require.NoError(t, err, string(out))
+}
+
+func unpauseGamma(t *testing.T) {
+	exec.Command("docker", "unpause", "orbs-gamma-server").CombinedOutput()
 }

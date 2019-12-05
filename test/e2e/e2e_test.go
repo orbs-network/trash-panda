@@ -58,12 +58,23 @@ func Test_Relay(t *testing.T) {
 	tx, txId, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc")
 	require.NoError(t, err)
 
+	pauseGamma(t)
+	defer unpauseGamma(t)
+
 	_, err = client.SendTransaction(tx)
-	require.NoError(t, err)
+	require.Error(t, err)
 	//require.EqualValues(t, res.ExecutionResult, codec.EXECUTION_RESULT_SUCCESS)
 	//require.EqualValues(t, uint64(1), res.OutputArguments[0].(uint64))
 
+	println("hmmm")
+	//time.Sleep(10 * time.Second)
+	unpauseGamma(t)
+	println("hmmm1")
+
+	//_, fakeTxId, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, "fakeContract", "fakeMethod")
+
+	println(txId)
 	txStatus, err := client.GetTransactionStatus(txId)
-	require.NoError(t, err)
+	require.NoError(t, err, "huh")
 	require.EqualValues(t, codec.TRANSACTION_STATUS_COMMITTED, txStatus.TransactionStatus)
 }

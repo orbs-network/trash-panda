@@ -2,10 +2,12 @@ package transparent
 
 import (
 	"bytes"
+	"context"
 	"github.com/orbs-network/orbs-client-sdk-go/orbs"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 func sendHttpPost(endpoint string, payload []byte) (*http.Response, []byte, error) {
@@ -13,7 +15,13 @@ func sendHttpPost(endpoint string, payload []byte) (*http.Response, []byte, erro
 		return nil, nil, errors.New("payload sent by http is empty")
 	}
 
-	res, err := http.Post(endpoint, orbs.CONTENT_TYPE_MEMBUFFERS, bytes.NewReader(payload))
+	// FIXME propagate timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequest("POST", endpoint, bytes.NewReader(payload))
+	req.Header.Set("Content-Type", orbs.CONTENT_TYPE_MEMBUFFERS)
+
+	res, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed sending http post")
 	}
