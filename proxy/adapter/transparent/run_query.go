@@ -15,7 +15,7 @@ func runQuery(h *handler, data []byte) (input membuffers.Message, output membuff
 		return nil, nil, e
 	}
 
-	res, resBody, e := sendHttpPost(h.config.Endpoints[0]+h.path, data)
+	res, resBody, e := h.transport.Send(h.config.Endpoints[0]+h.path, data)
 	if e != nil {
 		return input, nil, &proxy.HttpErr{http.StatusBadRequest, log.Error(e), e.Error()}
 	}

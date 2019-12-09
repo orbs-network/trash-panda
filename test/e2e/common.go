@@ -7,10 +7,9 @@ import (
 	"github.com/orbs-network/orbs-client-sdk-go/orbs"
 	"github.com/orbs-network/trash-panda/boostrap"
 	"github.com/orbs-network/trash-panda/proxy/adapter/transparent"
+	"github.com/orbs-network/trash-panda/transport"
 	"github.com/stretchr/testify/require"
 	"math/rand"
-	"os/exec"
-
 	//"os"
 	//"os/exec"
 	"testing"
@@ -29,15 +28,15 @@ func contractTest(t *testing.T, f func(t *testing.T, endpoint string, vcid uint3
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		endpoint := getTrashPandaEndpoint(ctx)
+		endpoint := getTrashPandaEndpoint(ctx, transport.NewHttpTransport())
 		f(t, endpoint, GAMMA_VCHAIN)
 	})
 }
 
-func getTrashPandaEndpoint(ctx context.Context) string {
+func getTrashPandaEndpoint(ctx context.Context, transport transport.Transport) string {
 	httpAddress := fmt.Sprintf("localhost:%d", rand.Intn(63000))
 	endpoint := fmt.Sprintf("http://%s/vchains/42", httpAddress)
-	boostrap.NewTrashPanda(ctx, transparent.NewTransparentAdapter, httpAddress, 42)
+	boostrap.NewTrashPanda(ctx, transparent.NewTransparentAdapter, transport, httpAddress, 42)
 	return endpoint
 }
 
@@ -57,13 +56,4 @@ func deployIncrementContractToGamma(t *testing.T) (contractName string) {
 	require.EqualValues(t, res.ExecutionResult, codec.EXECUTION_RESULT_SUCCESS)
 
 	return
-}
-
-func pauseGamma(t *testing.T) {
-	out, err := exec.Command("docker", "pause", "orbs-gamma-server").CombinedOutput()
-	require.NoError(t, err, string(out))
-}
-
-func unpauseGamma(t *testing.T) {
-	exec.Command("docker", "unpause", "orbs-gamma-server").CombinedOutput()
 }

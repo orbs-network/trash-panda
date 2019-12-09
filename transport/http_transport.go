@@ -1,4 +1,4 @@
-package transparent
+package transport
 
 import (
 	"bytes"
@@ -10,7 +10,14 @@ import (
 	"time"
 )
 
-func sendHttpPost(endpoint string, payload []byte) (*http.Response, []byte, error) {
+type httpTransport struct {
+}
+
+func NewHttpTransport() Transport {
+	return &httpTransport{}
+}
+
+func (t *httpTransport) Send(endpoint string, payload []byte) (*http.Response, []byte, error) {
 	if len(payload) == 0 {
 		return nil, nil, errors.New("payload sent by http is empty")
 	}
