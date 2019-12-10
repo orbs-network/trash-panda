@@ -6,6 +6,7 @@ import (
 	"github.com/orbs-network/orbs-client-sdk-go/codec"
 	"github.com/orbs-network/orbs-client-sdk-go/orbs"
 	"github.com/orbs-network/trash-panda/bootstrap"
+	"github.com/orbs-network/trash-panda/config"
 	"github.com/orbs-network/trash-panda/transport"
 	"github.com/stretchr/testify/require"
 	"math/rand"
@@ -25,15 +26,21 @@ func contractTest(t *testing.T, f func(t *testing.T, endpoint string, vcid uint3
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		endpoint := getTrashPandaEndpoint(ctx, transport.NewHttpTransport())
+		endpoint := startTrashPanda(ctx, transport.NewHttpTransport())
 		f(t, endpoint, GAMMA_VCHAIN)
 	})
 }
 
-func getTrashPandaEndpoint(ctx context.Context, transport transport.Transport) string {
+func startTrashPanda(ctx context.Context, transport transport.Transport) string {
 	httpAddress := fmt.Sprintf("localhost:%d", rand.Intn(63000))
 	endpoint := fmt.Sprintf("http://%s/vchains/42", httpAddress)
-	bootstrap.NewTrashPanda(ctx, transport, httpAddress, 42)
+	bootstrap.NewTrashPanda(ctx, transport, &config.Config{
+		HttpAddress: httpAddress,
+		Endpoints: []string{
+			GAMMA_ENDPOINT,
+		},
+		VirtualChains: []uint32{GAMMA_VCHAIN},
+	})
 	return endpoint
 }
 

@@ -8,18 +8,18 @@ import (
 	"github.com/orbs-network/trash-panda/transport"
 )
 
-func NewTrashPanda(ctx context.Context, transport transport.Transport, httpAddress string, ids ...uint32) *httpserver.HttpServer {
+func NewTrashPanda(ctx context.Context, transport transport.Transport, cfg *config.Config) *httpserver.HttpServer {
 	logger := config.GetLogger()
-	httpConfig := httpserver.NewServerConfig(httpAddress)
+	httpConfig := httpserver.NewServerConfig(cfg.HttpAddress)
 	server := httpserver.NewHttpServer(ctx, httpConfig, logger)
 
-	for _, id := range ids {
-		cfg := proxy.Config{
-			VirtualChainId: id,
-			Endpoints:      []string{"http://localhost:8080"},
+	for _, vcid := range cfg.VirtualChains {
+		proxyConfig := proxy.Config{
+			VirtualChainId: vcid,
+			Endpoints:      cfg.Endpoints,
 		}
 
-		p := proxy.NewService(cfg, transport, logger)
+		p := proxy.NewService(proxyConfig, transport, logger)
 		p.UpdateRoutes(server)
 		p.ResendTxQueue(ctx)
 	}

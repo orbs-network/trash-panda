@@ -53,7 +53,7 @@ func Test_Relay(t *testing.T) {
 	defer cancel()
 
 	fakeTransport := transport.NewMockTransport()
-	endpoint := getTrashPandaEndpoint(ctx, fakeTransport)
+	endpoint := startTrashPanda(ctx, fakeTransport)
 
 	account, _ := orbs.CreateAccount()
 	client := orbs.NewClient(endpoint, GAMMA_VCHAIN, codec.NETWORK_TYPE_TEST_NET)
