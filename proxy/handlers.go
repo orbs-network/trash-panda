@@ -1,10 +1,8 @@
 package proxy
 
 import (
-	"github.com/orbs-network/govnr"
 	"github.com/orbs-network/membuffers/go"
 	"github.com/orbs-network/scribe/log"
-	"github.com/orbs-network/trash-panda/config"
 	"github.com/orbs-network/trash-panda/transport"
 	"net/http"
 )
@@ -14,7 +12,7 @@ type HandlerBuilderFunc func(data []byte) (input membuffers.Message, output memb
 type Handler interface {
 	Name() string
 	Path() string
-	Handler() HandlerBuilderFunc
+	Handle(data []byte) (input membuffers.Message, output membuffers.Message, err *HttpErr)
 }
 
 type builderFunc func(h *handler, data []byte) (input membuffers.Message, output membuffers.Message, err *HttpErr)
@@ -67,24 +65,8 @@ func (h *handler) Path() string {
 	return h.path
 }
 
-type container struct {
-	input  membuffers.Message
-	output membuffers.Message
-	err    *HttpErr
-}
-
-func (h *handler) Handler() HandlerBuilderFunc {
-	return func(data []byte) (input membuffers.Message, output membuffers.Message, err *HttpErr) {
-		result := make(chan container)
-
-		govnr.Once(config.NewErrorHandler(nil), func() {
-			i, o, e := h.f(h, data)
-			result <- container{i, o, e}
-		})
-
-		r := <-result
-		return r.input, r.output, r.err
-	}
+func (h *handler) Handle(data []byte) (input membuffers.Message, output membuffers.Message, err *HttpErr) {
+	return h.f(h, data)
 }
 
 func validate(m membuffers.Message) *HttpErr {

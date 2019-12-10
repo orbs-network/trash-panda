@@ -38,7 +38,7 @@ func NewService(cfg Config, transport transport.Transport, logger log.Logger) *S
 
 func (s *Service) UpdateRoutes(server *httpserver.HttpServer) {
 	for _, h := range s.handlers {
-		server.RegisterHttpHandler(server.Router(), s.getPath(h.Path()), true, s.wrapHandler(h.Handler()))
+		server.RegisterHttpHandler(server.Router(), s.getPath(h.Path()), true, s.wrapHandler(h))
 	}
 }
 
@@ -49,7 +49,7 @@ func (s *Service) ResendTxQueue(ctx context.Context) {
 			s.logger.Info("received callback", log.Stringable("message", message))
 			switch message.(type) {
 			case *client.SendTransactionRequest:
-				input, _, err := s.findHandler("send-transaction").Handler()(message.Raw())
+				input, _, err := s.findHandler("send-transaction").Handle(message.Raw())
 				if err != nil {
 					go s.txCollectionCallback(input)
 				}
@@ -75,14 +75,14 @@ func (s *Service) getPath(path string) string {
 	return fmt.Sprintf("/vchains/%d%s", s.config.VirtualChainId, path)
 }
 
-func (s *Service) wrapHandler(handlerBuilder HandlerBuilderFunc) http.HandlerFunc {
+func (s *Service) wrapHandler(h Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bytes, e := readInput(r)
 		if e != nil {
 			s.writeErrorResponseAndLog(w, e)
 			return
 		}
-		input, output, err := handlerBuilder(bytes)
+		input, output, err := h.Handle(bytes)
 
 		//s.logger.Info("received request", log.Stringable("request", input))
 		s.txCollectionCallback(input)
