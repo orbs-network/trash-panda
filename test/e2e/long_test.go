@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"sync"
 	"testing"
 	"time"
 )
@@ -64,20 +65,29 @@ func Test_LongRun(t *testing.T) {
 	client := orbs.NewClient(endpoint, TESTNET_VCHAIN, codec.NETWORK_TYPE_TEST_NET)
 
 	for b := 0; b < MAX_BATCHES; b++ {
+		var wg sync.WaitGroup
+
 		for i := 0; i < BATCH_SIZE; i++ {
-			rawTx, _, _ := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc")
-			response, err := client.SendTransaction(rawTx)
+			wg.Add(1)
 
-			var status = ""
-			if response != nil {
-				status = response.TransactionStatus.String()
-			} else if err != nil {
-				status = err.Error()
-			}
+			go func() {
+				rawTx, _, _ := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc")
+				response, err := client.SendTransaction(rawTx)
 
-			fmt.Printf("%d/%d [%d/%d] %s\n", i, BATCH_SIZE, b, MAX_BATCHES, status)
+				var status = ""
+				if response != nil {
+					status = response.TransactionStatus.String()
+				} else if err != nil {
+					status = err.Error()
+				}
+
+				fmt.Printf("%d/%d [%d/%d] %s\n", i, BATCH_SIZE, b, MAX_BATCHES, status)
+
+				wg.Done()
+			}()
 		}
 
+		wg.Wait()
 		<-time.After(INTERVAL)
 	}
 

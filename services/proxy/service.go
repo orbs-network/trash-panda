@@ -56,7 +56,8 @@ func (s *service) RelayTransactions(ctx context.Context) {
 			_, output, err := sendTxHandler.Handle((&client.SendTransactionRequestBuilder{
 				SignedTransaction: protocol.SignedTransactionBuilderFromRaw(signedTransaction.Raw()),
 			}).Build().Raw())
-			if err != nil {
+
+			if err != nil && err.ToError() != nil {
 				// FIXME error handling
 				return protocol.TRANSACTION_STATUS_RESERVED, err.ToError()
 			}
