@@ -42,6 +42,7 @@ func Test_LongRun(t *testing.T) {
 		Endpoints: []string{
 			DEMONET_NODE3,
 		},
+		EndpointTimeoutMs: 5000, // 5s
 	})
 	ioutil.WriteFile(TEST_CONFIG, rawJSON, 0644)
 

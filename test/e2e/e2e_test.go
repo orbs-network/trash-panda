@@ -48,10 +48,6 @@ func Test_SendTransaction(t *testing.T) {
 	})
 }
 
-func Test_SendTransactionWithTimeout(t *testing.T) {
-	t.Skip("not implemented")
-}
-
 func Test_SendTransactionAsync(t *testing.T) {
 	contractTest(t, func(t *testing.T, endpoint string, vcid uint32) {
 		account, _ := orbs.CreateAccount()
@@ -92,8 +88,11 @@ func Test_Relay(t *testing.T) {
 
 	fakeTransport.Off()
 
-	_, err = client.SendTransaction(tx)
-	require.Error(t, err)
+	res, err := client.SendTransaction(tx)
+	require.NoError(t, err)
+	require.EqualValues(t, res.RequestStatus, codec.REQUEST_STATUS_IN_PROCESS)
+	require.EqualValues(t, res.ExecutionResult, codec.EXECUTION_RESULT_NOT_EXECUTED)
+	require.EqualValues(t, res.TransactionStatus, codec.TRANSACTION_STATUS_PENDING)
 
 	fakeTransport.On()
 

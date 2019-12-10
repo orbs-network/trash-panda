@@ -3,6 +3,7 @@ package transport
 import (
 	"github.com/pkg/errors"
 	"net/http"
+	"time"
 )
 
 type MockTransport struct {
@@ -12,8 +13,10 @@ type MockTransport struct {
 
 func NewMockTransport() *MockTransport {
 	return &MockTransport{
-		on:            true,
-		httpTransport: NewHttpTransport(),
+		on: true,
+		httpTransport: NewHttpTransport(Config{
+			Timeout: 1 * time.Second,
+		}),
 	}
 }
 

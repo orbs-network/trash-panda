@@ -5,16 +5,18 @@ import (
 )
 
 type Config struct {
-	HttpAddress   string
-	Gamma         bool
-	Endpoints     []string
-	VirtualChains []uint32
+	HttpAddress       string
+	Gamma             bool
+	Endpoints         []string
+	EndpointTimeoutMs int // milliseconds
+	VirtualChains     []uint32
 }
 
 var defaultConfig = Config{
-	Endpoints:     []string{"http://localhost:8080"},
-	VirtualChains: []uint32{42},
-	HttpAddress:   "localhost:9876",
+	Endpoints:         []string{"http://localhost:8080"},
+	VirtualChains:     []uint32{42},
+	HttpAddress:       "localhost:9876",
+	EndpointTimeoutMs: 60000,
 }
 
 func Parse(input []byte) (*Config, error) {
@@ -31,6 +33,10 @@ func Parse(input []byte) (*Config, error) {
 
 	if cfg.HttpAddress == "" {
 		cfg.HttpAddress = defaultConfig.HttpAddress
+	}
+
+	if cfg.EndpointTimeoutMs == 0 {
+		cfg.EndpointTimeoutMs = defaultConfig.EndpointTimeoutMs
 	}
 
 	return cfg, err

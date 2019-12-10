@@ -8,6 +8,7 @@ import (
 	"github.com/orbs-network/trash-panda/config"
 	"github.com/orbs-network/trash-panda/transport"
 	"io/ioutil"
+	"time"
 )
 
 func main() {
@@ -30,7 +31,9 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	server := bootstrap.NewTrashPanda(ctx, transport.NewHttpTransport(), cfg)
+	server := bootstrap.NewTrashPanda(ctx, transport.NewHttpTransport(transport.Config{
+		Timeout: time.Duration(cfg.EndpointTimeoutMs) * time.Millisecond,
+	}), cfg)
 	if err != nil {
 		logger.Error("failed to start the service", log.Error(err))
 		cancel()

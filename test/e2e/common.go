@@ -27,7 +27,9 @@ func contractTest(t *testing.T, f func(t *testing.T, endpoint string, vcid uint3
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		endpoint := startTrashPanda(ctx, transport.NewHttpTransport())
+		endpoint := startTrashPanda(ctx, transport.NewHttpTransport(transport.Config{
+			Timeout: 100 * time.Millisecond,
+		}))
 		f(t, endpoint, GAMMA_VCHAIN)
 	})
 }

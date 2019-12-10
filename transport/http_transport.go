@@ -10,11 +10,18 @@ import (
 	"time"
 )
 
-type httpTransport struct {
+type Config struct {
+	Timeout time.Duration
 }
 
-func NewHttpTransport() Transport {
-	return &httpTransport{}
+type httpTransport struct {
+	config Config
+}
+
+func NewHttpTransport(config Config) Transport {
+	return &httpTransport{
+		config: config,
+	}
 }
 
 func (t *httpTransport) Send(endpoint string, payload []byte) (*http.Response, []byte, error) {
@@ -22,8 +29,8 @@ func (t *httpTransport) Send(endpoint string, payload []byte) (*http.Response, [
 		return nil, nil, errors.New("payload sent by http is empty")
 	}
 
-	// FIXME propagate timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// FIXME propagate Timeout
+	ctx, cancel := context.WithTimeout(context.Background(), t.config.Timeout)
 	defer cancel()
 	req, err := http.NewRequest("POST", endpoint, bytes.NewReader(payload))
 	req.Header.Set("Content-Type", orbs.CONTENT_TYPE_MEMBUFFERS)
