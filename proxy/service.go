@@ -31,7 +31,7 @@ func NewService(cfg Config, transport transport.Transport, logger log.Logger) *S
 	return &Service{
 		config:   cfg,
 		logger:   logger,
-		handlers: GetHandlers(cfg, transport),
+		handlers: GetHandlers(cfg, transport, logger),
 		queue:    make(chan membuffers.Message),
 	}
 }
@@ -84,7 +84,6 @@ func (s *Service) wrapHandler(h Handler) http.HandlerFunc {
 		}
 		input, output, err := h.Handle(bytes)
 
-		//s.logger.Info("received request", log.Stringable("request", input))
 		s.txCollectionCallback(input)
 
 		if err != nil {

@@ -7,8 +7,6 @@ import (
 	"net/http"
 )
 
-type HandlerBuilderFunc func(data []byte) (input membuffers.Message, output membuffers.Message, err *HttpErr)
-
 type Handler interface {
 	Name() string
 	Path() string
@@ -22,11 +20,12 @@ type handler struct {
 	path      string
 	config    Config
 	transport transport.Transport
+	logger    log.Logger
 
 	f builderFunc
 }
 
-func GetHandlers(config Config, transport transport.Transport) []Handler {
+func GetHandlers(config Config, transport transport.Transport, logger log.Logger) []Handler {
 	// FIXME add more handlers
 	//server.RegisterHttpHandler(server.Router(), s.getPath(SEND_TRANSACTION_ASYNC), true, s.sendTransactionAsyncHandler)
 	//server.RegisterHttpHandler(server.Router(), s.getPath(GET_TRANSACTION_RECEIPT_PROOF), true, s.getTransactionReceiptProofHandler)
@@ -38,6 +37,7 @@ func GetHandlers(config Config, transport transport.Transport) []Handler {
 			path:      "/api/v1/run-query",
 			config:    config,
 			transport: transport,
+			logger:    logger,
 			f:         runQuery,
 		},
 		&handler{
@@ -45,6 +45,7 @@ func GetHandlers(config Config, transport transport.Transport) []Handler {
 			path:      "/api/v1/send-transaction",
 			config:    config,
 			transport: transport,
+			logger:    logger,
 			f:         sendTransaction,
 		},
 		&handler{
@@ -52,6 +53,7 @@ func GetHandlers(config Config, transport transport.Transport) []Handler {
 			path:      "/api/v1/get-transaction-status",
 			config:    config,
 			transport: transport,
+			logger:    logger,
 			f:         getTransactionStatus,
 		},
 	}

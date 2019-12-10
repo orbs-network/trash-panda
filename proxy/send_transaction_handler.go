@@ -14,6 +14,8 @@ func sendTransaction(h *handler, data []byte) (input membuffers.Message, output 
 		return nil, nil, e
 	}
 
+	h.logger.Info("received request", log.Stringable("request", input))
+
 	res, resBody, e := h.transport.Send(h.config.Endpoints[0]+h.path, data)
 	if e != nil {
 		return input, nil, &HttpErr{http.StatusBadRequest, log.Error(e), e.Error()}
