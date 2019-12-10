@@ -5,13 +5,10 @@ import (
 	"fmt"
 	"github.com/orbs-network/orbs-client-sdk-go/codec"
 	"github.com/orbs-network/orbs-client-sdk-go/orbs"
-	"github.com/orbs-network/trash-panda/boostrap"
-	"github.com/orbs-network/trash-panda/proxy/adapter/transparent"
+	"github.com/orbs-network/trash-panda/bootstrap"
 	"github.com/orbs-network/trash-panda/transport"
 	"github.com/stretchr/testify/require"
 	"math/rand"
-	//"os"
-	//"os/exec"
 	"testing"
 	"time"
 )
@@ -36,7 +33,7 @@ func contractTest(t *testing.T, f func(t *testing.T, endpoint string, vcid uint3
 func getTrashPandaEndpoint(ctx context.Context, transport transport.Transport) string {
 	httpAddress := fmt.Sprintf("localhost:%d", rand.Intn(63000))
 	endpoint := fmt.Sprintf("http://%s/vchains/42", httpAddress)
-	boostrap.NewTrashPanda(ctx, transparent.NewTransparentAdapter, transport, httpAddress, 42)
+	bootstrap.NewTrashPanda(ctx, transport, httpAddress, 42)
 	return endpoint
 }
 

@@ -6,7 +6,6 @@ import (
 	"github.com/orbs-network/scribe/log"
 	"github.com/orbs-network/trash-panda/boostrap"
 	"github.com/orbs-network/trash-panda/config"
-	"github.com/orbs-network/trash-panda/proxy/adapter/transparent"
 	"github.com/orbs-network/trash-panda/transport"
 	"io/ioutil"
 )
@@ -31,7 +30,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	server := boostrap.NewTrashPanda(ctx, transparent.NewTransparentAdapter, transport.NewHttpTransport(), cfg.HttpAddress, cfg.VirtualChains...)
+	server := bootstrap.NewTrashPanda(ctx, transport.NewHttpTransport(), cfg.HttpAddress, cfg.VirtualChains...)
 	if err != nil {
 		logger.Error("failed to start the service", log.Error(err))
 		cancel()

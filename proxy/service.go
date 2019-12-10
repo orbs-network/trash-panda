@@ -7,16 +7,17 @@ import (
 	"github.com/orbs-network/membuffers/go"
 	"github.com/orbs-network/orbs-spec/types/go/protocol/client"
 	"github.com/orbs-network/scribe/log"
-	"github.com/orbs-network/trash-panda/boostrap/httpserver"
+	"github.com/orbs-network/trash-panda/bootstrap/httpserver"
 	"github.com/orbs-network/trash-panda/config"
+	"github.com/orbs-network/trash-panda/transport"
 	"net/http"
 	"time"
 )
 
 type Service struct {
-	logger  log.Logger
-	config  Config
-	adapter ProxyAdapter
+	logger   log.Logger
+	config   Config
+	handlers []Handler
 
 	queue chan membuffers.Message
 }
@@ -26,17 +27,17 @@ type Config struct {
 	Endpoints      []string
 }
 
-func NewService(cfg Config, adapter ProxyAdapter, logger log.Logger) *Service {
+func NewService(cfg Config, transport transport.Transport, logger log.Logger) *Service {
 	return &Service{
-		config:  cfg,
-		logger:  logger,
-		adapter: adapter,
-		queue:   make(chan membuffers.Message),
+		config:   cfg,
+		logger:   logger,
+		handlers: GetHandlers(cfg, transport),
+		queue:    make(chan membuffers.Message),
 	}
 }
 
 func (s *Service) UpdateRoutes(server *httpserver.HttpServer) {
-	for _, h := range s.adapter.Handlers() {
+	for _, h := range s.handlers {
 		server.RegisterHttpHandler(server.Router(), s.getPath(h.Path()), true, s.wrapHandler(h.Handler()))
 	}
 }
@@ -97,7 +98,7 @@ func (s *Service) wrapHandler(handlerBuilder HandlerBuilderFunc) http.HandlerFun
 }
 
 func (s *Service) findHandler(name string) Handler {
-	for _, h := range s.adapter.Handlers() {
+	for _, h := range s.handlers {
 		if h.Name() == name {
 			return h
 		}
