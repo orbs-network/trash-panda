@@ -13,7 +13,7 @@ type HttpErr struct {
 	Message  string
 }
 
-func (s *Service) writeMembuffResponse(w http.ResponseWriter, message membuffers.Message, httpCode int, errorForVerbosity error) {
+func (s *service) writeMembuffResponse(w http.ResponseWriter, message membuffers.Message, httpCode int, errorForVerbosity error) {
 	w.Header().Set("Content-Type", "application/membuffers")
 
 	if errorForVerbosity != nil {
@@ -26,7 +26,7 @@ func (s *Service) writeMembuffResponse(w http.ResponseWriter, message membuffers
 	}
 }
 
-func (s *Service) writeErrorResponseAndLog(w http.ResponseWriter, m *HttpErr) {
+func (s *service) writeErrorResponseAndLog(w http.ResponseWriter, m *HttpErr) {
 	if m.LogField == nil {
 		s.logger.Info(m.Message)
 	} else {

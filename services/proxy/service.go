@@ -5,21 +5,22 @@ import (
 	"fmt"
 	"github.com/orbs-network/govnr"
 	"github.com/orbs-network/membuffers/go"
+	"github.com/orbs-network/orbs-spec/types/go/protocol"
 	"github.com/orbs-network/orbs-spec/types/go/protocol/client"
 	"github.com/orbs-network/scribe/log"
 	"github.com/orbs-network/trash-panda/bootstrap/httpserver"
 	"github.com/orbs-network/trash-panda/config"
+	"github.com/orbs-network/trash-panda/services/storage"
 	"github.com/orbs-network/trash-panda/transport"
 	"net/http"
 	"time"
 )
 
-type Service struct {
+type service struct {
 	logger   log.Logger
 	config   Config
+	storage  storage.Storage
 	handlers []Handler
-
-	queue chan membuffers.Message
 }
 
 type Config struct {
@@ -27,55 +28,65 @@ type Config struct {
 	Endpoints      []string
 }
 
-func NewService(cfg Config, transport transport.Transport, logger log.Logger) *Service {
-	return &Service{
+type Proxy interface {
+	UpdateRoutes(server *httpserver.HttpServer)
+	RelayTransactions(ctx context.Context)
+}
+
+func NewService(cfg Config, storage storage.Storage, transport transport.Transport, logger log.Logger) *service {
+	return &service{
 		config:   cfg,
 		logger:   logger,
 		handlers: GetHandlers(cfg, transport, logger),
-		queue:    make(chan membuffers.Message),
+		storage:  storage,
 	}
 }
 
-func (s *Service) UpdateRoutes(server *httpserver.HttpServer) {
+func (s *service) UpdateRoutes(server *httpserver.HttpServer) {
 	for _, h := range s.handlers {
 		server.RegisterHttpHandler(server.Router(), s.getPath(h.Path()), true, s.wrapHandler(h))
 	}
 }
 
-func (s *Service) ResendTxQueue(ctx context.Context) {
+func (s *service) RelayTransactions(ctx context.Context) {
+	sendTxHandler := s.findHandler("send-transaction")
+
 	handle := govnr.Forever(ctx, "http server", config.NewErrorHandler(s.logger), func() {
-		select {
-		case message := <-s.queue:
-			s.logger.Info("received callback", log.Stringable("message", message))
-			switch message.(type) {
-			case *client.SendTransactionRequest:
-				input, _, err := s.findHandler("send-transaction").Handle(message.Raw())
-				if err != nil {
-					go s.txCollectionCallback(input)
-				}
+		s.storage.ProcessIncomingTransactions(func(txId []byte, signedTransaction *protocol.SignedTransaction) (protocol.TransactionStatus, error) {
+			_, output, err := sendTxHandler.Handle((&client.SendTransactionRequestBuilder{
+				SignedTransaction: protocol.SignedTransactionBuilderFromRaw(signedTransaction.Raw()),
+			}).Build().Raw())
+			if err != nil {
+				// FIXME error handling
+				return protocol.TRANSACTION_STATUS_RESERVED, err.LogField.Error
 			}
 
-			<-time.After(100 * time.Millisecond)
-		case <-ctx.Done():
-			close(s.queue)
-			s.logger.Info("shutting down")
-			return
-		}
+			s.logger.Info("!!!relay", log.Stringable("response", output))
+
+			return output.(*client.SendTransactionResponse).TransactionStatus(), nil
+		})
+
+		<-time.After(100 * time.Millisecond)
 	})
 
 	supervisor := &govnr.TreeSupervisor{}
 	supervisor.Supervise(handle)
 }
 
-func (s *Service) txCollectionCallback(message membuffers.Message) {
-	s.queue <- message
+func (s *service) storeInput(message membuffers.Message) error {
+	switch message.(type) {
+	case *client.SendTransactionRequest:
+		return s.storage.StoreIncomingTransaction(message.(*client.SendTransactionRequest).SignedTransaction())
+	}
+
+	return nil
 }
 
-func (s *Service) getPath(path string) string {
+func (s *service) getPath(path string) string {
 	return fmt.Sprintf("/vchains/%d%s", s.config.VirtualChainId, path)
 }
 
-func (s *Service) wrapHandler(h Handler) http.HandlerFunc {
+func (s *service) wrapHandler(h Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bytes, e := readInput(r)
 		if e != nil {
@@ -84,7 +95,9 @@ func (s *Service) wrapHandler(h Handler) http.HandlerFunc {
 		}
 		input, output, err := h.Handle(bytes)
 
-		s.txCollectionCallback(input)
+		if err := s.storeInput(input); err != nil {
+			s.logger.Error("failed to store incoming transaction", log.Error(err))
+		}
 
 		if err != nil {
 			s.logger.Error("error occurred", err.LogField)
@@ -96,7 +109,7 @@ func (s *Service) wrapHandler(h Handler) http.HandlerFunc {
 	}
 }
 
-func (s *Service) findHandler(name string) Handler {
+func (s *service) findHandler(name string) Handler {
 	for _, h := range s.handlers {
 		if h.Name() == name {
 			return h
