@@ -32,21 +32,32 @@ func contractTest(t *testing.T, f func(t *testing.T, endpoint string, vcid uint3
 }
 
 func startTrashPanda(ctx context.Context, transport transport.Transport) string {
-	httpAddress := fmt.Sprintf("localhost:%d", rand.Intn(63000))
-	endpoint := fmt.Sprintf("http://%s/vchains/42", httpAddress)
+	httpAddress, endpoint := getRandomAddressAndEnpoint(GAMMA_VCHAIN)
 	bootstrap.NewTrashPanda(ctx, transport, &config.Config{
 		HttpAddress: httpAddress,
 		Endpoints: []string{
 			GAMMA_ENDPOINT,
 		},
 		VirtualChains: []uint32{GAMMA_VCHAIN},
+		Gamma:         true,
 	})
 	return endpoint
 }
 
+func getRandomAddressAndEnpoint(vcid uint32) (httpAddress string, endpoint string) {
+	httpAddress = fmt.Sprintf("localhost:%d", rand.Intn(63000))
+	endpoint = fmt.Sprintf("http://%s/vchains/%d", httpAddress, vcid)
+
+	return
+}
+
 func deployIncrementContractToGamma(t *testing.T) (contractName string) {
 	account, _ := orbs.CreateAccount()
-	client := orbs.NewClient(GAMMA_ENDPOINT, GAMMA_VCHAIN, codec.NETWORK_TYPE_TEST_NET)
+	return deployIncrementContract(t, account, GAMMA_ENDPOINT, GAMMA_VCHAIN)
+}
+
+func deployIncrementContract(t *testing.T, account *orbs.OrbsAccount, endpoint string, vchain uint32) (contractName string) {
+	client := orbs.NewClient(endpoint, vchain, codec.NETWORK_TYPE_TEST_NET)
 
 	sources, err := orbs.ReadSourcesFromDir("../_contracts/counter")
 	require.NoError(t, err)

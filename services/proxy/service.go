@@ -61,7 +61,7 @@ func (s *service) RelayTransactions(ctx context.Context) {
 				return protocol.TRANSACTION_STATUS_RESERVED, err.LogField.Error
 			}
 
-			s.logger.Info("!!!relay", log.Stringable("response", output))
+			s.logger.Info("relay response", log.Stringable("response", output))
 
 			return output.(*client.SendTransactionResponse).TransactionStatus(), nil
 		})

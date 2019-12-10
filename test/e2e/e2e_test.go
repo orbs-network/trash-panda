@@ -46,6 +46,14 @@ func Test_SendTransaction(t *testing.T) {
 	})
 }
 
+func Test_SendTransactionWithTimeout(t *testing.T) {
+	t.Skip("not implemented")
+}
+
+func Test_SendTransactionAsync(t *testing.T) {
+	t.Skip("not implemented")
+}
+
 func Test_Relay(t *testing.T) {
 	contractName := deployIncrementContractToGamma(t)
 

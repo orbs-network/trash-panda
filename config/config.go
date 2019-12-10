@@ -6,6 +6,7 @@ import (
 
 type Config struct {
 	HttpAddress   string
+	Gamma         bool
 	Endpoints     []string
 	VirtualChains []uint32
 }

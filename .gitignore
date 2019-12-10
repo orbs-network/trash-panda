@@ -1,3 +1,4 @@
 .idea
 orbs-test-keys.json
 *.bolt
+config.test.json

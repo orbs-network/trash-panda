@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"github.com/orbs-network/trash-panda/bootstrap/httpserver"
 	"github.com/orbs-network/trash-panda/config"
 	"github.com/orbs-network/trash-panda/services/proxy"
@@ -15,6 +16,14 @@ func NewTrashPanda(ctx context.Context, transport transport.Transport, cfg *conf
 	server := httpserver.NewHttpServer(ctx, httpConfig, logger)
 
 	for _, vcid := range cfg.VirtualChains {
+		endpoints := cfg.Endpoints
+
+		if !cfg.Gamma {
+			for i, endpoint := range endpoints {
+				endpoints[i] = fmt.Sprintf("%s/vchains/%d", endpoint, vcid)
+			}
+		}
+
 		proxyConfig := proxy.Config{
 			VirtualChainId: vcid,
 			Endpoints:      cfg.Endpoints,

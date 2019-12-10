@@ -135,6 +135,7 @@ func (s *storage) storeProcessedTransactionStatus(tx *bolt.Tx, txId []byte, stat
 }
 
 func (s *storage) Shutdown() (err error) {
+	// FIXME proper shutdown
 	if err = s.db.Sync(); err != nil {
 		s.logger.Error("failed to synchronize storage on shutdown")
 	}
