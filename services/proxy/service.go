@@ -58,7 +58,7 @@ func (s *service) RelayTransactions(ctx context.Context) {
 			}).Build().Raw())
 			if err != nil {
 				// FIXME error handling
-				return protocol.TRANSACTION_STATUS_RESERVED, err.LogField.Error
+				return protocol.TRANSACTION_STATUS_RESERVED, err.ToError()
 			}
 
 			s.logger.Info("relay response", log.Stringable("response", output))
@@ -99,12 +99,12 @@ func (s *service) wrapHandler(h Handler) http.HandlerFunc {
 			s.logger.Error("failed to store incoming transaction", log.Error(err))
 		}
 
-		if err != nil {
+		if output != nil {
+			s.logger.Info("responded with", log.Stringable("response", output))
+			s.writeMembuffResponse(w, output, err.Code, nil)
+		} else {
 			s.logger.Error("error occurred", err.LogField)
 			s.writeErrorResponseAndLog(w, err)
-		} else {
-			s.logger.Info("responded with", log.Stringable("response", output))
-			s.writeMembuffResponse(w, output, 200, nil)
 		}
 	}
 }

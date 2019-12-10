@@ -24,18 +24,14 @@ const DEMONET_NODE3 = "http://node3.demonet.orbs.com"
 
 const TEST_CONFIG = "./config.test.json"
 
-func removeDB() {
-	os.RemoveAll("./vchain-1003.bolt")
-}
-
 func removeConfig() {
 	os.RemoveAll(TEST_CONFIG)
 }
 
 func Test_LongRun(t *testing.T) {
-	//t.Skip("manual test")
+	t.Skip("manual test")
 
-	removeDB()
+	removeDB(1003)
 	removeConfig()
 
 	httpAddress, endpoint := getRandomAddressAndEnpoint(TESTNET_VCHAIN)

@@ -25,5 +25,5 @@ func runQuery(h *handler, data []byte) (input membuffers.Message, output membuff
 		return input, nil, &HttpErr{res.StatusCode, log.Error(errors.New(res.Status)), res.Header.Get("X-ORBS-ERROR-DETAILS")}
 	}
 
-	return input, client.RunQueryResponseReader(resBody), nil
+	return input, client.RunQueryResponseReader(resBody), &HttpErr{Code: res.StatusCode}
 }

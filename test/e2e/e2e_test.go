@@ -20,6 +20,7 @@ func Test_RunQuery(t *testing.T) {
 
 		res, err := client.SendQuery(query)
 		require.NoError(t, err)
+		require.EqualValues(t, res.RequestStatus, codec.REQUEST_STATUS_COMPLETED)
 		require.GreaterOrEqual(t, res.BlockHeight, uint64(1))
 	})
 
@@ -38,6 +39,7 @@ func Test_SendTransaction(t *testing.T) {
 		res, err := client.SendTransaction(tx)
 		require.NoError(t, err)
 		require.EqualValues(t, res.ExecutionResult, codec.EXECUTION_RESULT_SUCCESS)
+		require.EqualValues(t, res.RequestStatus, codec.REQUEST_STATUS_COMPLETED)
 		require.EqualValues(t, uint64(1), res.OutputArguments[0].(uint64))
 
 		txStatus, err := client.GetTransactionStatus(txId)
@@ -51,7 +53,26 @@ func Test_SendTransactionWithTimeout(t *testing.T) {
 }
 
 func Test_SendTransactionAsync(t *testing.T) {
-	t.Skip("not implemented")
+	contractTest(t, func(t *testing.T, endpoint string, vcid uint32) {
+		account, _ := orbs.CreateAccount()
+		client := orbs.NewClient(endpoint, vcid, codec.NETWORK_TYPE_TEST_NET)
+
+		contractName := deployIncrementContractToGamma(t)
+
+		tx, txId, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc")
+		require.NoError(t, err)
+
+		res, err := client.SendTransactionAsync(tx)
+		require.NoError(t, err)
+		require.EqualValues(t, res.RequestStatus, codec.REQUEST_STATUS_IN_PROCESS)
+		require.EqualValues(t, res.ExecutionResult, codec.EXECUTION_RESULT_NOT_EXECUTED)
+		require.EqualValues(t, res.TransactionStatus, codec.TRANSACTION_STATUS_PENDING)
+
+		time.Sleep(1 * time.Second)
+		txStatus, err := client.GetTransactionStatus(txId)
+		require.NoError(t, err)
+		require.EqualValues(t, codec.TRANSACTION_STATUS_COMMITTED, txStatus.TransactionStatus)
+	})
 }
 
 func Test_Relay(t *testing.T) {

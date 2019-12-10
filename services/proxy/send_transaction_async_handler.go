@@ -8,21 +8,28 @@ import (
 	"net/http"
 )
 
-func getTransactionStatus(h *handler, data []byte) (input membuffers.Message, output membuffers.Message, err *HttpErr) {
-	input = client.GetTransactionStatusRequestReader(data)
+func sendTransactionAsync(h *handler, data []byte) (input membuffers.Message, output membuffers.Message, err *HttpErr) {
+	input = client.SendTransactionRequestReader(data)
 	if e := validate(input); e != nil {
 		return nil, nil, e
 	}
 
 	h.logger.Info("received request", log.Stringable("request", input))
+
 	res, resBody, e := h.transport.Send(h.config.Endpoints[0]+h.path, data)
 	if e != nil {
 		return input, nil, &HttpErr{http.StatusBadRequest, log.Error(e), e.Error()}
 	}
 
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode != http.StatusAccepted {
+		//readerResponse := (&client.SendTransactionResponseBuilder{
+		//	TransactionStatus: protocol.TRANSACTION_STATUS_PENDING,
+		//	RequestResult: &client.RequestResultBuilder{
+		//		RequestStatus: protocol.REQUEST_STATUS_IN_PROCESS,
+		//	},
+		//}).Build()
 		return input, nil, &HttpErr{res.StatusCode, log.Error(errors.New(res.Status)), res.Header.Get("X-ORBS-ERROR-DETAILS")}
 	}
 
-	return input, client.GetTransactionStatusResponseReader(resBody), &HttpErr{Code: res.StatusCode}
+	return input, client.SendTransactionResponseReader(resBody), &HttpErr{Code: res.StatusCode}
 }

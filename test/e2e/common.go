@@ -10,6 +10,7 @@ import (
 	"github.com/orbs-network/trash-panda/transport"
 	"github.com/stretchr/testify/require"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 )
@@ -32,6 +33,7 @@ func contractTest(t *testing.T, f func(t *testing.T, endpoint string, vcid uint3
 }
 
 func startTrashPanda(ctx context.Context, transport transport.Transport) string {
+	removeDB(GAMMA_VCHAIN)
 	httpAddress, endpoint := getRandomAddressAndEnpoint(GAMMA_VCHAIN)
 	bootstrap.NewTrashPanda(ctx, transport, &config.Config{
 		HttpAddress: httpAddress,
@@ -45,7 +47,8 @@ func startTrashPanda(ctx context.Context, transport transport.Transport) string 
 }
 
 func getRandomAddressAndEnpoint(vcid uint32) (httpAddress string, endpoint string) {
-	httpAddress = fmt.Sprintf("localhost:%d", rand.Intn(63000))
+	rand.Seed(time.Now().UnixNano())
+	httpAddress = fmt.Sprintf("localhost:%d", rand.Int31n(63000))
 	endpoint = fmt.Sprintf("http://%s/vchains/%d", httpAddress, vcid)
 
 	return
@@ -71,4 +74,8 @@ func deployIncrementContract(t *testing.T, account *orbs.OrbsAccount, endpoint s
 	require.EqualValues(t, res.ExecutionResult, codec.EXECUTION_RESULT_SUCCESS)
 
 	return
+}
+
+func removeDB(vcid uint32) {
+	os.RemoveAll(fmt.Sprintf("./vchain-%d.bolt", vcid))
 }

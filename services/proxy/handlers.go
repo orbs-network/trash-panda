@@ -27,7 +27,6 @@ type handler struct {
 
 func GetHandlers(config Config, transport transport.Transport, logger log.Logger) []Handler {
 	// FIXME add more handlers
-	//server.RegisterHttpHandler(server.Router(), s.getPath(SEND_TRANSACTION_ASYNC), true, s.sendTransactionAsyncHandler)
 	//server.RegisterHttpHandler(server.Router(), s.getPath(GET_TRANSACTION_RECEIPT_PROOF), true, s.getTransactionReceiptProofHandler)
 	//server.RegisterHttpHandler(server.Router(), s.getPath(GET_BLOCK), true, s.getBlockHandler)
 
@@ -47,6 +46,14 @@ func GetHandlers(config Config, transport transport.Transport, logger log.Logger
 			transport: transport,
 			logger:    logger,
 			f:         sendTransaction,
+		},
+		&handler{
+			name:      "send-transaction-async",
+			path:      "/api/v1/send-transaction-async",
+			config:    config,
+			transport: transport,
+			logger:    logger,
+			f:         sendTransactionAsync,
 		},
 		&handler{
 			name:      "get-transaction-status",
