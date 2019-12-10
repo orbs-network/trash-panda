@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"github.com/orbs-network/scribe/log"
-	"github.com/orbs-network/trash-panda/boostrap"
 	"github.com/orbs-network/trash-panda/bootstrap"
 	"github.com/orbs-network/trash-panda/config"
 	"github.com/orbs-network/trash-panda/transport"

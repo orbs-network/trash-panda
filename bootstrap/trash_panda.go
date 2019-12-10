@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/orbs-network/trash-panda/bootstrap/httpserver"
 	"github.com/orbs-network/trash-panda/config"
-	"github.com/orbs-network/trash-panda/proxy"
+	"github.com/orbs-network/trash-panda/services/proxy"
 	"github.com/orbs-network/trash-panda/transport"
 )
 
