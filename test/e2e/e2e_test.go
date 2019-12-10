@@ -7,6 +7,7 @@ import (
 	"github.com/orbs-network/trash-panda/transport"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 func Test_RunQuery(t *testing.T) {
@@ -67,7 +68,9 @@ func Test_Relay(t *testing.T) {
 
 	fakeTransport.On()
 
+	time.Sleep(1 * time.Second)
+
 	txStatus, err := client.GetTransactionStatus(txId)
-	require.NoError(t, err, "huh")
+	require.NoError(t, err)
 	require.EqualValues(t, codec.TRANSACTION_STATUS_COMMITTED, txStatus.TransactionStatus)
 }

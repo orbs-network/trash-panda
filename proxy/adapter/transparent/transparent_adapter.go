@@ -1,8 +1,10 @@
 package transparent
 
 import (
+	"github.com/orbs-network/govnr"
 	"github.com/orbs-network/membuffers/go"
 	"github.com/orbs-network/scribe/log"
+	"github.com/orbs-network/trash-panda/config"
 	"github.com/orbs-network/trash-panda/proxy"
 	"github.com/orbs-network/trash-panda/transport"
 	"net/http"
@@ -78,11 +80,10 @@ func (h *handler) Handler() proxy.HandlerBuilderFunc {
 	return func(data []byte) (input membuffers.Message, output membuffers.Message, err *proxy.HttpErr) {
 		result := make(chan container)
 
-		// FIXME this is very ugly
-		go func() {
+		govnr.Once(config.NewErrorHandler(nil), func() {
 			i, o, e := h.f(h, data)
 			result <- container{i, o, e}
-		}()
+		})
 
 		r := <-result
 		return r.input, r.output, r.err

@@ -19,9 +19,11 @@ func NewMockTransport() *MockTransport {
 
 func (t *MockTransport) Send(endpoint string, payload []byte) (*http.Response, []byte, error) {
 	if t.on {
+		println("sending payload to", endpoint)
 		return t.httpTransport.Send(endpoint, payload)
 	}
 
+	println("skipping payload to", endpoint)
 	return nil, nil, errors.New("failed to send payload")
 }
 

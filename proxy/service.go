@@ -3,10 +3,14 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"github.com/orbs-network/govnr"
 	"github.com/orbs-network/membuffers/go"
+	"github.com/orbs-network/orbs-spec/types/go/protocol/client"
 	"github.com/orbs-network/scribe/log"
 	"github.com/orbs-network/trash-panda/boostrap/httpserver"
+	"github.com/orbs-network/trash-panda/config"
 	"net/http"
+	"time"
 )
 
 type Service struct {
@@ -38,18 +42,28 @@ func (s *Service) UpdateRoutes(server *httpserver.HttpServer) {
 }
 
 func (s *Service) ResendTxQueue(ctx context.Context) {
-	go func() {
-		for {
-			select {
-			case message := <-s.queue:
-				s.logger.Info("received callback", log.Stringable("message", message))
-			case <-ctx.Done():
-				close(s.queue)
-				s.logger.Info("shutting down")
-				return
+	handle := govnr.Forever(ctx, "http server", config.NewErrorHandler(s.logger), func() {
+		select {
+		case message := <-s.queue:
+			s.logger.Info("received callback", log.Stringable("message", message))
+			switch message.(type) {
+			case *client.SendTransactionRequest:
+				input, _, err := s.findHandler("send-transaction").Handler()(message.Raw())
+				if err != nil {
+					go s.txCollectionCallback(input)
+				}
 			}
+
+			<-time.After(100 * time.Millisecond)
+		case <-ctx.Done():
+			close(s.queue)
+			s.logger.Info("shutting down")
+			return
 		}
-	}()
+	})
+
+	supervisor := &govnr.TreeSupervisor{}
+	supervisor.Supervise(handle)
 }
 
 func (s *Service) txCollectionCallback(message membuffers.Message) {
@@ -69,7 +83,7 @@ func (s *Service) wrapHandler(handlerBuilder HandlerBuilderFunc) http.HandlerFun
 		}
 		input, output, err := handlerBuilder(bytes)
 
-		s.logger.Info("received request", log.Stringable("request", input))
+		//s.logger.Info("received request", log.Stringable("request", input))
 		s.txCollectionCallback(input)
 
 		if err != nil {
@@ -80,4 +94,14 @@ func (s *Service) wrapHandler(handlerBuilder HandlerBuilderFunc) http.HandlerFun
 			s.writeMembuffResponse(w, output, 200, nil)
 		}
 	}
+}
+
+func (s *Service) findHandler(name string) Handler {
+	for _, h := range s.adapter.Handlers() {
+		if h.Name() == name {
+			return h
+		}
+	}
+
+	return nil
 }
