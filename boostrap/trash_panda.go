@@ -8,7 +8,7 @@ import (
 	"github.com/orbs-network/trash-panda/transport"
 )
 
-func NewTrashPanda(ctx context.Context, adapterFactory func(proxy.Config, transport.Transport) proxy.ProxyAdapter, transport transport.Transport, httpAddress string, ids ...uint32) {
+func NewTrashPanda(ctx context.Context, adapterFactory func(proxy.Config, transport.Transport) proxy.ProxyAdapter, transport transport.Transport, httpAddress string, ids ...uint32) *httpserver.HttpServer {
 	logger := config.GetLogger()
 	httpConfig := httpserver.NewServerConfig(httpAddress)
 	server := httpserver.NewHttpServer(ctx, httpConfig, logger)
@@ -23,4 +23,6 @@ func NewTrashPanda(ctx context.Context, adapterFactory func(proxy.Config, transp
 		p.UpdateRoutes(server)
 		p.ResendTxQueue(ctx)
 	}
+
+	return server
 }
