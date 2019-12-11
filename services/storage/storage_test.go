@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"github.com/orbs-network/orbs-client-sdk-go/codec"
 	"github.com/orbs-network/orbs-client-sdk-go/orbs"
 	"github.com/orbs-network/orbs-spec/types/go/protocol"
@@ -43,17 +42,17 @@ func TestStorage_StoreTransaction(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestStorage_ProcessIncomingTransactions(t *testing.T) {
+func TestStorage_GetIncomingTransactions(t *testing.T) {
 	removeDB()
 
 	account, _ := orbs.CreateAccount()
 	orbsClient := orbs.NewClient(GAMMA_ENDPOINT, GAMMA_VCHAIN, codec.NETWORK_TYPE_TEST_NET)
 
-	tx, _, err := orbsClient.CreateTransaction(account.PublicKey, account.PrivateKey,
+	tx, txId, err := orbsClient.CreateTransaction(account.PublicKey, account.PrivateKey,
 		"Music1974", "getAlbum", "Diamond Dogs")
 	require.NoError(t, err)
 
-	anotherTx, _, _ := orbsClient.CreateTransaction(account.PublicKey, account.PrivateKey,
+	anotherTx, anotherTxId, _ := orbsClient.CreateTransaction(account.PublicKey, account.PrivateKey,
 		"Music1974", "getAlbum", "Station to Station")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -70,31 +69,16 @@ func TestStorage_ProcessIncomingTransactions(t *testing.T) {
 	err = s.StoreTransaction(anotherSignedTx, protocol.TRANSACTION_STATUS_RESERVED)
 	require.NoError(t, err)
 
-	transactionsProcessed := 0
-	err = s.ProcessIncomingTransactions(context.Background(), 5, func(incomingTransactions map[string]*protocol.SignedTransaction) (results map[string]protocol.TransactionStatus) {
-		require.EqualValues(t, 2, len(incomingTransactions))
-		results = make(map[string]protocol.TransactionStatus)
-		for incomingTxId, _ := range incomingTransactions {
-			results[incomingTxId] = protocol.TRANSACTION_STATUS_COMMITTED
-			transactionsProcessed++
-		}
-
-		return
-	})
+	incomingTransactions, err := s.GetIncomingTransactions(context.Background(), 5)
 	require.NoError(t, err)
-	require.EqualValues(t, 2, transactionsProcessed)
+	require.EqualValues(t, 2, len(incomingTransactions))
 
-	transactionsProcessedTheSecondTime := 0
-	err = s.ProcessIncomingTransactions(context.Background(), 5, func(incomingTransactions map[string]*protocol.SignedTransaction) (results map[string]protocol.TransactionStatus) {
-		for incomingTxId, _ := range incomingTransactions {
-			transactionsProcessedTheSecondTime++
-			results[incomingTxId] = protocol.TRANSACTION_STATUS_COMMITTED
-		}
+	s.UpdateTransactionStatus(txId, protocol.TRANSACTION_STATUS_COMMITTED)
+	s.UpdateTransactionStatus(anotherTxId, protocol.TRANSACTION_STATUS_DUPLICATE_TRANSACTION_ALREADY_COMMITTED)
 
-		return
-	})
+	incomingTransactions, err = s.GetIncomingTransactions(context.Background(), 5)
 	require.NoError(t, err)
-	require.EqualValues(t, 0, transactionsProcessedTheSecondTime)
+	require.EqualValues(t, 0, len(incomingTransactions))
 }
 
 func TestStorage_WaitForShutdown(t *testing.T) {
@@ -117,10 +101,11 @@ func TestStorage_WaitForShutdown(t *testing.T) {
 
 	go func() {
 		for {
-			err = s.ProcessIncomingTransactions(context.Background(), 1, func(incomingTransactions map[string]*protocol.SignedTransaction) (results map[string]protocol.TransactionStatus) {
-				fmt.Printf("processing %v", incomingTransactions)
-				return
-			})
+			txs, _ := s.GetIncomingTransactions(context.Background(), 1)
+			for txId, _ := range txs {
+				s.UpdateTransactionStatus(txId, protocol.TRANSACTION_STATUS_COMMITTED)
+			}
+
 			time.Sleep(100 * time.Millisecond)
 		}
 	}()
@@ -135,4 +120,62 @@ func TestStorage_WaitForShutdown(t *testing.T) {
 	})
 	require.NoError(t, err)
 	boltDb.Close()
+}
+
+const MAX_TX = 500
+const BATCH_SIZE = 5
+const INSERT_INTEVAL = 3 * time.Millisecond
+const UPDATE_INTERVAL = 10 * time.Millisecond
+
+func Test_Concurrency(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s, err := NewStorageForChain(ctx, config.GetLogger(), "./", GAMMA_VCHAIN, false)
+	require.NoError(t, err)
+
+	account, _ := orbs.CreateAccount()
+	orbsClient := orbs.NewClient(GAMMA_ENDPOINT, GAMMA_VCHAIN, codec.NETWORK_TYPE_TEST_NET)
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				break
+			}
+			txs, _ := s.GetIncomingTransactions(context.Background(), BATCH_SIZE)
+			for txId, _ := range txs {
+				s.UpdateTransactionStatus(txId, protocol.TRANSACTION_STATUS_COMMITTED)
+			}
+
+			<-time.After(UPDATE_INTERVAL)
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				break
+			}
+
+			tx, _, err := orbsClient.CreateTransaction(account.PublicKey, account.PrivateKey,
+				"Music1974", "getAlbum", "Diamond Dogs")
+			require.NoError(t, err)
+
+			signedTx := client.SendTransactionRequestReader(tx).SignedTransaction()
+			err = s.StoreTransaction(signedTx, protocol.TRANSACTION_STATUS_RESERVED)
+			require.NoError(t, err)
+
+			<-time.After(INSERT_INTEVAL)
+		}
+	}()
+
+	require.Eventually(t, func() bool {
+		stats, err := s.Stats()
+		if err != nil {
+			return false
+		}
+
+		return stats.Total == stats.Incoming+stats.Processed
+	}, 10*time.Second, INSERT_INTEVAL)
 }

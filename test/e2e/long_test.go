@@ -18,7 +18,7 @@ import (
 
 const MAX_BATCHES = 10
 const BATCH_SIZE = 50
-const INTERVAL = 10 * time.Second
+const INTERVAL = 5 * time.Second
 
 const TESTNET_VCHAIN = 1003
 
@@ -84,8 +84,9 @@ func Test_LongRun(t *testing.T) {
 		for i := 0; i < BATCH_SIZE; i++ {
 			wg.Add(1)
 
-			go func() {
-				rawTx, _, _ := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc")
+			go func(nonce uint32) {
+				rawTx, _, _ := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc", nonce)
+				fmt.Println(contractName, "inc", nonce)
 				response, err := client.SendTransaction(rawTx)
 
 				var status = ""
@@ -99,7 +100,7 @@ func Test_LongRun(t *testing.T) {
 				fmt.Printf("%d/%d [%d/%d] %s\n", i, BATCH_SIZE, b, MAX_BATCHES, status)
 
 				wg.Done()
-			}()
+			}(uint32(b + i))
 		}
 
 		wg.Wait()
@@ -115,7 +116,7 @@ func Test_LongRun(t *testing.T) {
 
 		println("value: ", res.OutputArguments[0].(uint64), "/", txSent, "/", MAX_BATCHES*BATCH_SIZE)
 		return res.OutputArguments[0].(uint64) == txSent
-	}, 5*time.Minute, 100*time.Millisecond)
+	}, 3*time.Minute, 1*time.Second)
 
 	m.stop()
 }

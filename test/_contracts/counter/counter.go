@@ -12,7 +12,7 @@ func _init() {
 
 }
 
-func inc() uint64 {
+func inc(nonce uint32) uint64 {
 	val := value() + 1
 	state.WriteUint64([]byte("counter"), val)
 	return val

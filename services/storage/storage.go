@@ -9,16 +9,23 @@ import (
 	"github.com/orbs-network/orbs-spec/types/go/protocol"
 	"github.com/orbs-network/scribe/log"
 	"github.com/orbs-network/trash-panda/config"
-	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 	"time"
 )
 
 type TxProcessor func(incomingTransactions map[string]*protocol.SignedTransaction) map[string]protocol.TransactionStatus
 
+type Stats struct {
+	Incoming  int
+	Processed int
+	Total     int
+}
+
 type Storage interface {
 	StoreTransaction(signedTx *protocol.SignedTransaction, status protocol.TransactionStatus) error
-	ProcessIncomingTransactions(ctx context.Context, batchSize uint, f TxProcessor) error
+	GetIncomingTransactions(ctx context.Context, batchSize uint) (map[string]*protocol.SignedTransaction, error)
+	UpdateTransactionStatus(txId string, status protocol.TransactionStatus) error
+	Stats() (Stats, error)
 	Shutdown() error
 }
 
@@ -64,6 +71,7 @@ func NewStorageForChain(ctx context.Context, logger log.Logger, dbPath string, v
 	return NewStorage(ctx, logger, fmt.Sprintf("%s/vchain-%d.bolt", dbPath, vcid), readOnly)
 }
 
+// FIXME probably shouldn't roll back ever?
 func (s *storage) StoreTransaction(signedTx *protocol.SignedTransaction, status protocol.TransactionStatus) error {
 	tx, err := s.db.Begin(true)
 	if err != nil {
@@ -95,6 +103,30 @@ func (s *storage) StoreTransaction(signedTx *protocol.SignedTransaction, status 
 	return tx.Commit()
 }
 
+func (s *storage) UpdateTransactionStatus(txId string, status protocol.TransactionStatus) error {
+	tx, err := s.db.Begin(true)
+	if err != nil {
+		return err
+	}
+
+	if isProcessed(status) {
+		txIdRaw, _ := encoding.DecodeHex(txId)
+		if err := s.removeTransactionFromQueue(tx, INCOMING, txIdRaw); err != nil {
+			return tx.Rollback()
+		}
+
+		if err := s.putTransactionIntoQueue(tx, PROCESSED, txIdRaw); err != nil {
+			return tx.Rollback()
+		}
+
+		if err := s.updateTransactionStatus(tx, txIdRaw, status); err != nil {
+			return tx.Rollback()
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (s *storage) storeSignedTransaction(tx *bolt.Tx, txIdRaw []byte, signedTx *protocol.SignedTransaction) error {
 	queueBucket := tx.Bucket([]byte(TRANSACTIONS))
 
@@ -116,48 +148,12 @@ func (s *storage) removeTransactionFromQueue(tx *bolt.Tx, queue string, txIdRaw 
 	return queueBucket.Delete(txIdRaw)
 }
 
-// FIXME should roll back on errors
-func (s *storage) ProcessIncomingTransactions(ctx context.Context, batchSize uint, f TxProcessor) error {
-	if batchSize == 0 {
-		return errors.New("batch size is 0")
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			break
-		default:
-
-		}
-
-		tx, err := s.db.Begin(true)
-		if err != nil {
-			return err
-		}
-
-		incomingTransactions := s.readIncomingTransactionsBatch(tx, batchSize)
-
-		if len(incomingTransactions) > 0 {
-			for txId, status := range f(incomingTransactions) {
-				if err == nil && isProcessed(status) {
-					txIdRaw, _ := encoding.DecodeHex(txId)
-					if err := s.removeTransactionFromQueue(tx, INCOMING, txIdRaw); err != nil {
-						return tx.Rollback()
-					}
-
-					if err := s.putTransactionIntoQueue(tx, PROCESSED, txIdRaw); err != nil {
-						return tx.Rollback()
-					}
-
-					if err := s.updateTransactionStatus(tx, txIdRaw, status); err != nil {
-						return tx.Rollback()
-					}
-				}
-			}
-		}
-
-		return tx.Commit()
-	}
+func (s *storage) GetIncomingTransactions(ctx context.Context, batchSize uint) (signedTransaction map[string]*protocol.SignedTransaction, err error) {
+	err = s.db.View(func(tx *bolt.Tx) error {
+		signedTransaction = s.readIncomingTransactionsBatch(tx, batchSize)
+		return nil
+	})
+	return
 }
 
 func (s *storage) readIncomingTransactionsBatch(tx *bolt.Tx, batchSize uint) (incomingTransactions map[string]*protocol.SignedTransaction) {
@@ -222,6 +218,18 @@ func (s *storage) createBuckets() error {
 	}
 
 	return tx.Commit()
+}
+
+func (s *storage) Stats() (stats Stats, err error) {
+	err = s.db.View(func(tx *bolt.Tx) error {
+		stats.Incoming = tx.Bucket([]byte(INCOMING)).Stats().KeyN
+		stats.Processed = tx.Bucket([]byte(PROCESSED)).Stats().KeyN
+		stats.Total = tx.Bucket([]byte(TRANSACTIONS)).Stats().KeyN
+
+		return nil
+	})
+
+	return
 }
 
 func isProcessed(status protocol.TransactionStatus) bool {
