@@ -6,6 +6,7 @@ import (
 	"github.com/orbs-network/orbs-client-sdk-go/orbs"
 	"github.com/pkg/errors"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"time"
 )
@@ -16,15 +17,17 @@ type Config struct {
 
 type httpTransport struct {
 	config Config
+	rand   *rand.Rand
 }
 
 func NewHttpTransport(config Config) Transport {
 	return &httpTransport{
 		config: config,
+		rand:   rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
-func (t *httpTransport) Send(endpoint string, payload []byte) (*http.Response, []byte, error) {
+func (t *httpTransport) Send(endpoint string, path string, payload []byte) (*http.Response, []byte, error) {
 	if len(payload) == 0 {
 		return nil, nil, errors.New("payload sent by http is empty")
 	}
@@ -32,7 +35,7 @@ func (t *httpTransport) Send(endpoint string, payload []byte) (*http.Response, [
 	// FIXME propagate Timeout
 	ctx, cancel := context.WithTimeout(context.Background(), t.config.Timeout)
 	defer cancel()
-	req, err := http.NewRequest("POST", endpoint, bytes.NewReader(payload))
+	req, err := http.NewRequest("POST", endpoint+path, bytes.NewReader(payload))
 	req.Header.Set("Content-Type", orbs.CONTENT_TYPE_MEMBUFFERS)
 
 	res, err := http.DefaultClient.Do(req.WithContext(ctx))
@@ -64,4 +67,16 @@ func (t *httpTransport) Send(endpoint string, payload []byte) (*http.Response, [
 	}
 
 	return res, buf, nil
+}
+
+func (t *httpTransport) SendRandom(endpoints []string, path string, payload []byte) (*http.Response, []byte, error) {
+	if len(endpoints) == 0 {
+		return nil, nil, errors.New("no endpoints were provided to HttpTransport")
+	}
+
+	return t.Send(t.getRandomEndpoint(endpoints), path, payload)
+}
+
+func (t *httpTransport) getRandomEndpoint(endpoints []string) string {
+	return endpoints[t.rand.Intn(len(endpoints))]
 }

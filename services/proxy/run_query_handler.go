@@ -16,7 +16,7 @@ func runQuery(h *handler, data []byte) (input membuffers.Message, output membuff
 
 	h.logger.Info("received request", log.Stringable("request", input))
 
-	res, resBody, e := h.transport.Send(h.config.Endpoints[0]+h.path, data)
+	res, resBody, e := h.transport.SendRandom(h.config.Endpoints, h.path, data)
 	if e != nil {
 		return input, nil, &HttpErr{http.StatusBadRequest, log.Error(e), e.Error()}
 	}

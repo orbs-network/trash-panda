@@ -49,9 +49,12 @@ func TestStorage_ProcessIncomingTransactions(t *testing.T) {
 	account, _ := orbs.CreateAccount()
 	orbsClient := orbs.NewClient(GAMMA_ENDPOINT, GAMMA_VCHAIN, codec.NETWORK_TYPE_TEST_NET)
 
-	tx, txId, err := orbsClient.CreateTransaction(account.PublicKey, account.PrivateKey,
+	tx, _, err := orbsClient.CreateTransaction(account.PublicKey, account.PrivateKey,
 		"Music1974", "getAlbum", "Diamond Dogs")
 	require.NoError(t, err)
+
+	anotherTx, _, _ := orbsClient.CreateTransaction(account.PublicKey, account.PrivateKey,
+		"Music1974", "getAlbum", "Station to Station")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -63,11 +66,15 @@ func TestStorage_ProcessIncomingTransactions(t *testing.T) {
 	err = s.StoreIncomingTransaction(signedTx)
 	require.NoError(t, err)
 
+	anotherSignedTx := client.SendTransactionRequestReader(anotherTx).SignedTransaction()
+	err = s.StoreIncomingTransaction(anotherSignedTx)
+	require.NoError(t, err)
+
 	transactionsProcessed := 0
-	err = s.ProcessIncomingTransactions(context.Background(), 1, func(incomingTransactions map[string]*protocol.SignedTransaction) (results map[string]protocol.TransactionStatus) {
+	err = s.ProcessIncomingTransactions(context.Background(), 5, func(incomingTransactions map[string]*protocol.SignedTransaction) (results map[string]protocol.TransactionStatus) {
+		require.EqualValues(t, 2, len(incomingTransactions))
 		results = make(map[string]protocol.TransactionStatus)
 		for incomingTxId, _ := range incomingTransactions {
-			require.EqualValues(t, txId, incomingTxId)
 			results[incomingTxId] = protocol.TRANSACTION_STATUS_COMMITTED
 			transactionsProcessed++
 		}
@@ -75,10 +82,10 @@ func TestStorage_ProcessIncomingTransactions(t *testing.T) {
 		return
 	})
 	require.NoError(t, err)
-	require.EqualValues(t, 1, transactionsProcessed)
+	require.EqualValues(t, 2, transactionsProcessed)
 
 	transactionsProcessedTheSecondTime := 0
-	err = s.ProcessIncomingTransactions(context.Background(), 1, func(incomingTransactions map[string]*protocol.SignedTransaction) (results map[string]protocol.TransactionStatus) {
+	err = s.ProcessIncomingTransactions(context.Background(), 5, func(incomingTransactions map[string]*protocol.SignedTransaction) (results map[string]protocol.TransactionStatus) {
 		for incomingTxId, _ := range incomingTransactions {
 			transactionsProcessedTheSecondTime++
 			results[incomingTxId] = protocol.TRANSACTION_STATUS_COMMITTED

@@ -16,12 +16,16 @@ import (
 	"time"
 )
 
-const MAX_BATCHES = 5
-const BATCH_SIZE = 10
+const MAX_BATCHES = 2
+const BATCH_SIZE = 2
 const INTERVAL = 10 * time.Second
 
 const TESTNET_VCHAIN = 1003
+
+const DEMONET_NODE1 = "http://node1.demonet.orbs.com"
+const DEMONET_NODE2 = "http://node2.demonet.orbs.com"
 const DEMONET_NODE3 = "http://node3.demonet.orbs.com"
+const DEMONET_NODE4 = "http://node4.demonet.orbs.com"
 
 const TEST_CONFIG = "./config.test.json"
 
@@ -29,8 +33,14 @@ func removeConfig() {
 	os.RemoveAll(TEST_CONFIG)
 }
 
+func skipUnlessTestnet(t *testing.T) {
+	if os.Getenv("TESTNET_ENABLED") != "true" {
+		t.Skip("testnet disabled")
+	}
+}
+
 func Test_LongRun(t *testing.T) {
-	t.Skip("manual test")
+	skipUnlessTestnet(t)
 
 	removeDB(1003)
 	removeConfig()
@@ -41,7 +51,10 @@ func Test_LongRun(t *testing.T) {
 		HttpAddress:   httpAddress,
 		VirtualChains: []uint32{TESTNET_VCHAIN},
 		Endpoints: []string{
+			DEMONET_NODE1,
+			DEMONET_NODE2,
 			DEMONET_NODE3,
+			DEMONET_NODE4,
 		},
 		EndpointTimeoutMs: 5000, // 5s
 	})

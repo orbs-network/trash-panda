@@ -21,7 +21,7 @@ var defaultConfig = Config{
 	HttpAddress:       "localhost:9876",
 	EndpointTimeoutMs: 60000,
 
-	RelayIntervalMs: 100,
+	RelayIntervalMs: 1000,
 	RelayBatchSize:  100,
 }
 

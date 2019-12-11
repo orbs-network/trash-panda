@@ -109,18 +109,20 @@ func (s *storage) ProcessIncomingTransactions(ctx context.Context, batchSize uin
 
 		incomingTransactions := s.readIncomingTransactionsBatch(txPool, batchSize)
 
-		for txId, status := range f(incomingTransactions) {
-			if err == nil && isProcessed(status) {
-				txIdRaw, _ := encoding.DecodeHex(txId)
-				if err := s.storeProcessedTransaction(tx, txIdRaw, incomingTransactions[txId]); err != nil {
-					return err
-				}
+		if len(incomingTransactions) > 0 {
+			for txId, status := range f(incomingTransactions) {
+				if err == nil && isProcessed(status) {
+					txIdRaw, _ := encoding.DecodeHex(txId)
+					if err := s.storeProcessedTransaction(tx, txIdRaw, incomingTransactions[txId]); err != nil {
+						return err
+					}
 
-				if err := s.storeProcessedTransactionStatus(tx, txIdRaw, status); err != nil {
-					return err
-				}
+					if err := s.storeProcessedTransactionStatus(tx, txIdRaw, status); err != nil {
+						return err
+					}
 
-				txPool.Delete(txIdRaw)
+					txPool.Delete(txIdRaw)
+				}
 			}
 		}
 

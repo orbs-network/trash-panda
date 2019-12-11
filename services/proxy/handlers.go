@@ -88,7 +88,7 @@ func (s *service) wrapHandler(h Handler) http.HandlerFunc {
 		}
 		input, output, err := h.Handle(bytes)
 
-		if err := s.storeInput(input); err != nil {
+		if err := s.storeInput(input, output); err != nil {
 			s.logger.Error("failed to store incoming transaction", log.Error(err))
 		}
 
@@ -102,10 +102,10 @@ func (s *service) wrapHandler(h Handler) http.HandlerFunc {
 	}
 }
 
-func (s *service) storeInput(message membuffers.Message) error {
-	switch message.(type) {
+func (s *service) storeInput(input membuffers.Message, output membuffers.Message) error {
+	switch input.(type) {
 	case *client.SendTransactionRequest:
-		return s.storage.StoreIncomingTransaction(message.(*client.SendTransactionRequest).SignedTransaction())
+		return s.storage.StoreIncomingTransaction(input.(*client.SendTransactionRequest).SignedTransaction())
 	}
 
 	return nil

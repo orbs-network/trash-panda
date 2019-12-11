@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+type statusContainer struct {
+	txId   string
+	status protocol.TransactionStatus
+}
+
 func (s *service) RelayTransactions(ctx context.Context) {
 	sendTxHandler := s.findHandler("send-transaction")
 
@@ -19,19 +24,41 @@ func (s *service) RelayTransactions(ctx context.Context) {
 
 			s.logger.Info("relaying transactions", log.Int("batch", len(signedTransactions)))
 
+			statusCH := make(chan *statusContainer)
 			for txId, signedTransaction := range signedTransactions {
-				_, output, err := sendTxHandler.Handle((&client.SendTransactionRequestBuilder{
-					SignedTransaction: protocol.SignedTransactionBuilderFromRaw(signedTransaction.Raw()),
-				}).Build().Raw())
+				govnr.Once(config.NewErrorHandler(s.logger.WithTags(log.String("txId", txId))), func() {
+					_, output, err := sendTxHandler.Handle((&client.SendTransactionRequestBuilder{
+						SignedTransaction: protocol.SignedTransactionBuilderFromRaw(signedTransaction.Raw()),
+					}).Build().Raw())
 
-				if err != nil && err.ToError() != nil {
-					s.logger.Info("relay error", log.Error(err.ToError()), log.String("txId", txId))
-					processedTransactions[txId] = protocol.TRANSACTION_STATUS_RESERVED
-				} else {
-					s.logger.Info("relay response", log.Stringable("response", output))
-					processedTransactions[txId] = output.(*client.SendTransactionResponse).TransactionStatus()
+					if err != nil && err.ToError() != nil {
+						s.logger.Info("relay error", log.Error(err.ToError()), log.String("txId", txId))
+						statusCH <- &statusContainer{
+							txId:   txId,
+							status: protocol.TRANSACTION_STATUS_RESERVED,
+						}
+					} else {
+						s.logger.Info("relay response", log.Stringable("response", output))
+						statusCH <- &statusContainer{
+							txId:   txId,
+							status: output.(*client.SendTransactionResponse).TransactionStatus(),
+						}
+					}
+				})
+
+			}
+
+			for i := uint(0); i < uint(len(signedTransactions)); i++ {
+				select {
+				case container := <-statusCH:
+					if container != nil {
+						processedTransactions[container.txId] = container.status
+					}
+				case <-ctx.Done():
+					break
 				}
 			}
+			close(statusCH)
 
 			return processedTransactions
 		})
