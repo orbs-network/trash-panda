@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"github.com/orbs-network/membuffers/go"
+	"github.com/orbs-network/orbs-spec/types/go/protocol"
 	"github.com/orbs-network/orbs-spec/types/go/protocol/client"
 	"github.com/orbs-network/scribe/log"
 	"github.com/orbs-network/trash-panda/transport"
@@ -105,7 +106,14 @@ func (s *service) wrapHandler(h Handler) http.HandlerFunc {
 func (s *service) storeInput(input membuffers.Message, output membuffers.Message) error {
 	switch input.(type) {
 	case *client.SendTransactionRequest:
-		return s.storage.StoreIncomingTransaction(input.(*client.SendTransactionRequest).SignedTransaction())
+		signedTransaction := input.(*client.SendTransactionRequest).SignedTransaction()
+		transactionStatus := protocol.TRANSACTION_STATUS_RESERVED
+
+		if res, ok := output.(*client.SendTransactionResponse); ok {
+			transactionStatus = res.TransactionStatus()
+		}
+
+		return s.storage.StoreTransaction(signedTransaction, transactionStatus)
 	}
 
 	return nil

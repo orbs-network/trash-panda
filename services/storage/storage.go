@@ -17,7 +17,7 @@ import (
 type TxProcessor func(incomingTransactions map[string]*protocol.SignedTransaction) map[string]protocol.TransactionStatus
 
 type Storage interface {
-	StoreIncomingTransaction(signedTx *protocol.SignedTransaction) error
+	StoreTransaction(signedTx *protocol.SignedTransaction, status protocol.TransactionStatus) error
 	ProcessIncomingTransactions(ctx context.Context, batchSize uint, f TxProcessor) error
 	Shutdown() error
 }
@@ -27,8 +27,9 @@ type storage struct {
 	db     *bolt.DB
 }
 
-const INCOMING_TRANSACTIONS = "incoming"
-const PROCESSED_TRANSACTIONS = "processed"
+const INCOMING = "incoming"
+const PROCESSED = "processed"
+const TRANSACTIONS = "transactions"
 const TRANSACTION_STATUS = "status"
 
 func NewStorage(ctx context.Context, logger log.Logger, dataSource string, readOnly bool) (Storage, error) {
@@ -53,7 +54,7 @@ func NewStorageForChain(ctx context.Context, logger log.Logger, dbPath string, v
 	return NewStorage(ctx, logger, fmt.Sprintf("%s/vchain-%d.bolt", dbPath, vcid), readOnly)
 }
 
-func (s *storage) StoreIncomingTransaction(signedTx *protocol.SignedTransaction) error {
+func (s *storage) StoreTransaction(signedTx *protocol.SignedTransaction, status protocol.TransactionStatus) error {
 	tx, err := s.db.Begin(true)
 	if err != nil {
 		return err
@@ -66,25 +67,55 @@ func (s *storage) StoreIncomingTransaction(signedTx *protocol.SignedTransaction)
 		}
 	}()
 
-	if err := s.storeSignedTransaction(tx, INCOMING_TRANSACTIONS, signedTx); err != nil {
+	txIdRaw := digest.CalcTxId(signedTx.Transaction())
+	if err := s.storeSignedTransaction(tx, txIdRaw, signedTx); err != nil {
 		return err
+	}
+
+	if err := s.updateTransactionStatus(tx, txIdRaw, status); err != nil {
+		return err
+	}
+
+	if !isProcessed(status) {
+		if err := s.putTransactionIntoQueue(tx, INCOMING, txIdRaw); err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit()
 }
 
-func (s *storage) storeSignedTransaction(tx *bolt.Tx, pool string, signedTx *protocol.SignedTransaction) error {
-	txPool, err := tx.CreateBucketIfNotExists([]byte(pool))
+func (s *storage) storeSignedTransaction(tx *bolt.Tx, txIdRaw []byte, signedTx *protocol.SignedTransaction) error {
+	queueBucket, err := tx.CreateBucketIfNotExists([]byte(TRANSACTIONS))
 	if err != nil {
 		return err
 	}
 
-	s.logger.Info("saving incoming transaction", log.Stringable("tx", signedTx))
-
-	txIdRaw := digest.CalcTxId(signedTx.Transaction())
-	return txPool.Put(txIdRaw, signedTx.Raw())
+	s.logger.Info("saving transaction", log.Stringable("tx", signedTx))
+	return queueBucket.Put(txIdRaw, signedTx.Raw())
 }
 
+func (s *storage) putTransactionIntoQueue(tx *bolt.Tx, queue string, txIdRaw []byte) error {
+	queueBucket, err := tx.CreateBucketIfNotExists([]byte(queue))
+	if err != nil {
+		return err
+	}
+
+	s.logger.Info("adding transaction to queue", log.String("queue", queue), log.String("txId", encoding.EncodeHex(txIdRaw)))
+	return queueBucket.Put(txIdRaw, WriteInt64(time.Now().UnixNano()))
+}
+
+func (s *storage) removeTransactionFromQueue(tx *bolt.Tx, queue string, txIdRaw []byte) error {
+	txPool, err := tx.CreateBucketIfNotExists([]byte(queue))
+	if err != nil {
+		return err
+	}
+
+	s.logger.Info("removing transaction from queue", log.String("queue", queue), log.String("txId", encoding.EncodeHex(txIdRaw)))
+	return txPool.Delete(txIdRaw)
+}
+
+// FIXME should roll back on errors
 func (s *storage) ProcessIncomingTransactions(ctx context.Context, batchSize uint, f TxProcessor) error {
 	if batchSize == 0 {
 		return errors.New("batch size is 0")
@@ -102,26 +133,24 @@ func (s *storage) ProcessIncomingTransactions(ctx context.Context, batchSize uin
 		if err != nil {
 			return err
 		}
-		txPool, err := tx.CreateBucketIfNotExists([]byte(INCOMING_TRANSACTIONS))
-		if err != nil {
-			return err
-		}
 
-		incomingTransactions := s.readIncomingTransactionsBatch(txPool, batchSize)
+		incomingTransactions := s.readIncomingTransactionsBatch(tx, batchSize)
 
 		if len(incomingTransactions) > 0 {
 			for txId, status := range f(incomingTransactions) {
 				if err == nil && isProcessed(status) {
 					txIdRaw, _ := encoding.DecodeHex(txId)
-					if err := s.storeProcessedTransaction(tx, txIdRaw, incomingTransactions[txId]); err != nil {
+					if err := s.removeTransactionFromQueue(tx, INCOMING, txIdRaw); err != nil {
 						return err
 					}
 
-					if err := s.storeProcessedTransactionStatus(tx, txIdRaw, status); err != nil {
+					if err := s.putTransactionIntoQueue(tx, PROCESSED, txIdRaw); err != nil {
 						return err
 					}
 
-					txPool.Delete(txIdRaw)
+					if err := s.updateTransactionStatus(tx, txIdRaw, status); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -130,29 +159,31 @@ func (s *storage) ProcessIncomingTransactions(ctx context.Context, batchSize uin
 	}
 }
 
-func (s *storage) readIncomingTransactionsBatch(txPool *bolt.Bucket, batchSize uint) (incomingTransactions map[string]*protocol.SignedTransaction) {
-	incomingTransactions = make(map[string]*protocol.SignedTransaction)
-	cursor := txPool.Cursor()
+func (s *storage) readIncomingTransactionsBatch(tx *bolt.Tx, batchSize uint) (incomingTransactions map[string]*protocol.SignedTransaction) {
+	incomingBucket, err := tx.CreateBucketIfNotExists([]byte(INCOMING))
+	if err != nil {
+		return nil
+	}
 
-	txIdRaw, signedTxRaw := cursor.First()
+	transactionsBucket, err := tx.CreateBucketIfNotExists([]byte(TRANSACTIONS))
+	if err != nil {
+		return nil
+	}
+
+	incomingTransactions = make(map[string]*protocol.SignedTransaction)
+	cursor := incomingBucket.Cursor()
+
+	txIdRaw, _ := cursor.First()
 	for i := uint(0); len(txIdRaw) != 0 && i < batchSize; i++ {
+		signedTxRaw := transactionsBucket.Get(txIdRaw)
 		incomingTransactions[encoding.EncodeHex(txIdRaw)] = protocol.SignedTransactionReader(signedTxRaw)
-		txIdRaw, signedTxRaw = cursor.Next()
+		txIdRaw, _ = cursor.Next()
 	}
 
 	return incomingTransactions
 }
 
-func (s *storage) storeProcessedTransaction(tx *bolt.Tx, txId []byte, signedTx *protocol.SignedTransaction) error {
-	txPool, err := tx.CreateBucketIfNotExists([]byte(PROCESSED_TRANSACTIONS))
-	if err != nil {
-		return err
-	}
-
-	return txPool.Put(txId, signedTx.Raw())
-}
-
-func (s *storage) storeProcessedTransactionStatus(tx *bolt.Tx, txId []byte, status protocol.TransactionStatus) error {
+func (s *storage) updateTransactionStatus(tx *bolt.Tx, txId []byte, status protocol.TransactionStatus) error {
 	txPool, err := tx.CreateBucketIfNotExists([]byte(TRANSACTION_STATUS))
 	if err != nil {
 		return err

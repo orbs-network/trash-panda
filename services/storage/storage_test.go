@@ -22,7 +22,7 @@ func removeDB() {
 	os.RemoveAll("./vchain-42.bolt")
 }
 
-func TestStorage_StoreIncomingTransaction(t *testing.T) {
+func TestStorage_StoreTransaction(t *testing.T) {
 	removeDB()
 
 	account, _ := orbs.CreateAccount()
@@ -39,7 +39,7 @@ func TestStorage_StoreIncomingTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	signedTx := client.SendTransactionRequestReader(tx).SignedTransaction()
-	err = s.StoreIncomingTransaction(signedTx)
+	err = s.StoreTransaction(signedTx, protocol.TRANSACTION_STATUS_RESERVED)
 	require.NoError(t, err)
 }
 
@@ -63,11 +63,11 @@ func TestStorage_ProcessIncomingTransactions(t *testing.T) {
 	require.NoError(t, err)
 
 	signedTx := client.SendTransactionRequestReader(tx).SignedTransaction()
-	err = s.StoreIncomingTransaction(signedTx)
+	err = s.StoreTransaction(signedTx, protocol.TRANSACTION_STATUS_RESERVED)
 	require.NoError(t, err)
 
 	anotherSignedTx := client.SendTransactionRequestReader(anotherTx).SignedTransaction()
-	err = s.StoreIncomingTransaction(anotherSignedTx)
+	err = s.StoreTransaction(anotherSignedTx, protocol.TRANSACTION_STATUS_RESERVED)
 	require.NoError(t, err)
 
 	transactionsProcessed := 0
@@ -112,7 +112,7 @@ func TestStorage_WaitForShutdown(t *testing.T) {
 	require.NoError(t, err)
 
 	signedTx := client.SendTransactionRequestReader(tx).SignedTransaction()
-	err = s.StoreIncomingTransaction(signedTx)
+	err = s.StoreTransaction(signedTx, protocol.TRANSACTION_STATUS_RESERVED)
 	require.NoError(t, err)
 
 	go func() {
