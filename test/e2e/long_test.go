@@ -16,8 +16,8 @@ import (
 	"time"
 )
 
-const MAX_BATCHES = 2
-const BATCH_SIZE = 2
+const MAX_BATCHES = 10
+const BATCH_SIZE = 50
 const INTERVAL = 10 * time.Second
 
 const TESTNET_VCHAIN = 1003
@@ -77,6 +77,7 @@ func Test_LongRun(t *testing.T) {
 
 	client := orbs.NewClient(endpoint, TESTNET_VCHAIN, codec.NETWORK_TYPE_TEST_NET)
 
+	txSent := uint64(0)
 	for b := 0; b < MAX_BATCHES; b++ {
 		var wg sync.WaitGroup
 
@@ -90,6 +91,7 @@ func Test_LongRun(t *testing.T) {
 				var status = ""
 				if response != nil {
 					status = response.TransactionStatus.String()
+					txSent++
 				} else if err != nil {
 					status = err.Error()
 				}
@@ -111,8 +113,9 @@ func Test_LongRun(t *testing.T) {
 			return false
 		}
 
-		return res.OutputArguments[0].(uint64) == uint64(MAX_BATCHES*BATCH_SIZE)
-	}, 1*time.Minute, 100*time.Millisecond)
+		println("value: ", res.OutputArguments[0].(uint64), "/", txSent, "/", MAX_BATCHES*BATCH_SIZE)
+		return res.OutputArguments[0].(uint64) == txSent
+	}, 5*time.Minute, 100*time.Millisecond)
 
 	m.stop()
 }

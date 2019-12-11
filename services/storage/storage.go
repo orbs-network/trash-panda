@@ -32,6 +32,13 @@ const PROCESSED = "processed"
 const TRANSACTIONS = "transactions"
 const TRANSACTION_STATUS = "status"
 
+var BUCKETS = []string{
+	INCOMING,
+	PROCESSED,
+	TRANSACTIONS,
+	TRANSACTION_STATUS,
+}
+
 func NewStorage(ctx context.Context, logger log.Logger, dataSource string, readOnly bool) (Storage, error) {
 	boltDb, err := bolt.Open(dataSource, 0600, &bolt.Options{
 		Timeout:  1 * time.Second,
@@ -45,8 +52,11 @@ func NewStorage(ctx context.Context, logger log.Logger, dataSource string, readO
 		logger,
 		boltDb,
 	}
-	storage.waitForShutdown(ctx)
+	if err := storage.createBuckets(); err != nil {
+		return nil, err
+	}
 
+	storage.waitForShutdown(ctx)
 	return storage, nil
 }
 
@@ -86,33 +96,24 @@ func (s *storage) StoreTransaction(signedTx *protocol.SignedTransaction, status 
 }
 
 func (s *storage) storeSignedTransaction(tx *bolt.Tx, txIdRaw []byte, signedTx *protocol.SignedTransaction) error {
-	queueBucket, err := tx.CreateBucketIfNotExists([]byte(TRANSACTIONS))
-	if err != nil {
-		return err
-	}
+	queueBucket := tx.Bucket([]byte(TRANSACTIONS))
 
 	s.logger.Info("saving transaction", log.Stringable("tx", signedTx))
 	return queueBucket.Put(txIdRaw, signedTx.Raw())
 }
 
 func (s *storage) putTransactionIntoQueue(tx *bolt.Tx, queue string, txIdRaw []byte) error {
-	queueBucket, err := tx.CreateBucketIfNotExists([]byte(queue))
-	if err != nil {
-		return err
-	}
+	queueBucket := tx.Bucket([]byte(queue))
 
 	s.logger.Info("adding transaction to queue", log.String("queue", queue), log.String("txId", encoding.EncodeHex(txIdRaw)))
 	return queueBucket.Put(txIdRaw, WriteInt64(time.Now().UnixNano()))
 }
 
 func (s *storage) removeTransactionFromQueue(tx *bolt.Tx, queue string, txIdRaw []byte) error {
-	txPool, err := tx.CreateBucketIfNotExists([]byte(queue))
-	if err != nil {
-		return err
-	}
+	queueBucket := tx.Bucket([]byte(queue))
 
 	s.logger.Info("removing transaction from queue", log.String("queue", queue), log.String("txId", encoding.EncodeHex(txIdRaw)))
-	return txPool.Delete(txIdRaw)
+	return queueBucket.Delete(txIdRaw)
 }
 
 // FIXME should roll back on errors
@@ -141,15 +142,15 @@ func (s *storage) ProcessIncomingTransactions(ctx context.Context, batchSize uin
 				if err == nil && isProcessed(status) {
 					txIdRaw, _ := encoding.DecodeHex(txId)
 					if err := s.removeTransactionFromQueue(tx, INCOMING, txIdRaw); err != nil {
-						return err
+						return tx.Rollback()
 					}
 
 					if err := s.putTransactionIntoQueue(tx, PROCESSED, txIdRaw); err != nil {
-						return err
+						return tx.Rollback()
 					}
 
 					if err := s.updateTransactionStatus(tx, txIdRaw, status); err != nil {
-						return err
+						return tx.Rollback()
 					}
 				}
 			}
@@ -160,15 +161,8 @@ func (s *storage) ProcessIncomingTransactions(ctx context.Context, batchSize uin
 }
 
 func (s *storage) readIncomingTransactionsBatch(tx *bolt.Tx, batchSize uint) (incomingTransactions map[string]*protocol.SignedTransaction) {
-	incomingBucket, err := tx.CreateBucketIfNotExists([]byte(INCOMING))
-	if err != nil {
-		return nil
-	}
-
-	transactionsBucket, err := tx.CreateBucketIfNotExists([]byte(TRANSACTIONS))
-	if err != nil {
-		return nil
-	}
+	incomingBucket := tx.Bucket([]byte(INCOMING))
+	transactionsBucket := tx.Bucket([]byte(TRANSACTIONS))
 
 	incomingTransactions = make(map[string]*protocol.SignedTransaction)
 	cursor := incomingBucket.Cursor()
@@ -184,10 +178,7 @@ func (s *storage) readIncomingTransactionsBatch(tx *bolt.Tx, batchSize uint) (in
 }
 
 func (s *storage) updateTransactionStatus(tx *bolt.Tx, txId []byte, status protocol.TransactionStatus) error {
-	txPool, err := tx.CreateBucketIfNotExists([]byte(TRANSACTION_STATUS))
-	if err != nil {
-		return err
-	}
+	txPool := tx.Bucket([]byte(TRANSACTION_STATUS))
 
 	s.logger.Info("updating status", log.Bytes("txId", txId), log.Stringable("status", status))
 
@@ -216,6 +207,21 @@ func (s *storage) waitForShutdown(ctx context.Context) {
 			s.Shutdown()
 		}
 	})
+}
+
+func (s *storage) createBuckets() error {
+	tx, err := s.db.Begin(true)
+	if err != nil {
+		return err
+	}
+
+	for _, bucket := range BUCKETS {
+		if _, err := tx.CreateBucketIfNotExists([]byte(bucket)); err != nil {
+			return tx.Rollback()
+		}
+	}
+
+	return tx.Commit()
 }
 
 func isProcessed(status protocol.TransactionStatus) bool {
