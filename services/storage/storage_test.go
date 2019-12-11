@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"encoding/hex"
+	"fmt"
 	"github.com/orbs-network/orbs-client-sdk-go/codec"
 	"github.com/orbs-network/orbs-client-sdk-go/orbs"
 	"github.com/orbs-network/orbs-spec/types/go/protocol"
@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 	"os"
-	"strings"
 	"testing"
 	"time"
 )
@@ -65,18 +64,27 @@ func TestStorage_ProcessIncomingTransactions(t *testing.T) {
 	require.NoError(t, err)
 
 	transactionsProcessed := 0
-	err = s.ProcessIncomingTransactions(context.Background(), func(txIdRaw []byte, incomingTransaction *protocol.SignedTransaction) (protocol.TransactionStatus, error) {
-		require.EqualValues(t, strings.ToLower(txId), "0x"+hex.EncodeToString(txIdRaw))
-		transactionsProcessed++
-		return protocol.TRANSACTION_STATUS_COMMITTED, nil
+	err = s.ProcessIncomingTransactions(context.Background(), 1, func(incomingTransactions map[string]*protocol.SignedTransaction) (results map[string]protocol.TransactionStatus) {
+		results = make(map[string]protocol.TransactionStatus)
+		for incomingTxId, _ := range incomingTransactions {
+			require.EqualValues(t, txId, incomingTxId)
+			results[incomingTxId] = protocol.TRANSACTION_STATUS_COMMITTED
+			transactionsProcessed++
+		}
+
+		return
 	})
 	require.NoError(t, err)
 	require.EqualValues(t, 1, transactionsProcessed)
 
 	transactionsProcessedTheSecondTime := 0
-	err = s.ProcessIncomingTransactions(context.Background(), func(txIdRaw []byte, incomingTransaction *protocol.SignedTransaction) (protocol.TransactionStatus, error) {
-		transactionsProcessedTheSecondTime++
-		return protocol.TRANSACTION_STATUS_COMMITTED, nil
+	err = s.ProcessIncomingTransactions(context.Background(), 1, func(incomingTransactions map[string]*protocol.SignedTransaction) (results map[string]protocol.TransactionStatus) {
+		for incomingTxId, _ := range incomingTransactions {
+			transactionsProcessedTheSecondTime++
+			results[incomingTxId] = protocol.TRANSACTION_STATUS_COMMITTED
+		}
+
+		return
 	})
 	require.NoError(t, err)
 	require.EqualValues(t, 0, transactionsProcessedTheSecondTime)
@@ -102,11 +110,10 @@ func TestStorage_WaitForShutdown(t *testing.T) {
 
 	go func() {
 		for {
-			s.ProcessIncomingTransactions(ctx, func(txId []byte, incomingTransaction *protocol.SignedTransaction) (protocol.TransactionStatus, error) {
-				println("processing", incomingTransaction.String())
-				return protocol.TRANSACTION_STATUS_RESERVED, nil
+			err = s.ProcessIncomingTransactions(context.Background(), 1, func(incomingTransactions map[string]*protocol.SignedTransaction) (results map[string]protocol.TransactionStatus) {
+				fmt.Printf("processing %v", incomingTransactions)
+				return
 			})
-
 			time.Sleep(100 * time.Millisecond)
 		}
 	}()

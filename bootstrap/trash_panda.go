@@ -8,6 +8,7 @@ import (
 	"github.com/orbs-network/trash-panda/services/proxy"
 	"github.com/orbs-network/trash-panda/services/storage"
 	"github.com/orbs-network/trash-panda/transport"
+	"time"
 )
 
 func NewTrashPanda(ctx context.Context, transport transport.Transport, cfg *config.Config) *httpserver.HttpServer {
@@ -16,18 +17,7 @@ func NewTrashPanda(ctx context.Context, transport transport.Transport, cfg *conf
 	server := httpserver.NewHttpServer(ctx, httpConfig, logger)
 
 	for _, vcid := range cfg.VirtualChains {
-		endpoints := cfg.Endpoints
-
-		if !cfg.Gamma {
-			for i, endpoint := range endpoints {
-				endpoints[i] = fmt.Sprintf("%s/vchains/%d", endpoint, vcid)
-			}
-		}
-
-		proxyConfig := proxy.Config{
-			VirtualChainId: vcid,
-			Endpoints:      cfg.Endpoints,
-		}
+		proxyConfig := buildProxyConfig(cfg, vcid)
 
 		s, err := storage.NewStorageForChain(ctx, logger, "./", vcid, false)
 		if err != nil {
@@ -41,4 +31,21 @@ func NewTrashPanda(ctx context.Context, transport transport.Transport, cfg *conf
 	}
 
 	return server
+}
+
+func buildProxyConfig(cfg *config.Config, vcid uint32) proxy.Config {
+	endpoints := cfg.Endpoints
+
+	if !cfg.Gamma {
+		for i, endpoint := range endpoints {
+			endpoints[i] = fmt.Sprintf("%s/vchains/%d", endpoint, vcid)
+		}
+	}
+
+	return proxy.Config{
+		VirtualChainId: vcid,
+		Endpoints:      endpoints,
+		RelayBatchSize: cfg.RelayBatchSize,
+		RelayInterval:  time.Duration(cfg.RelayIntervalMs) * time.Millisecond,
+	}
 }

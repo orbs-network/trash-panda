@@ -5,18 +5,20 @@ import (
 	"fmt"
 	"github.com/orbs-network/govnr"
 	"github.com/orbs-network/orbs-client-sdk-go/crypto/digest"
+	"github.com/orbs-network/orbs-client-sdk-go/crypto/encoding"
 	"github.com/orbs-network/orbs-spec/types/go/protocol"
 	"github.com/orbs-network/scribe/log"
 	"github.com/orbs-network/trash-panda/config"
+	"github.com/pkg/errors"
 	bolt "go.etcd.io/bbolt"
 	"time"
 )
 
-type TxProcessor func(txId []byte, incomingTransaction *protocol.SignedTransaction) (protocol.TransactionStatus, error)
+type TxProcessor func(incomingTransactions map[string]*protocol.SignedTransaction) map[string]protocol.TransactionStatus
 
 type Storage interface {
 	StoreIncomingTransaction(signedTx *protocol.SignedTransaction) error
-	ProcessIncomingTransactions(ctx context.Context, f TxProcessor) error
+	ProcessIncomingTransactions(ctx context.Context, batchSize uint, f TxProcessor) error
 	Shutdown() error
 }
 
@@ -77,40 +79,40 @@ func (s *storage) storeSignedTransaction(tx *bolt.Tx, pool string, signedTx *pro
 		return err
 	}
 
-	s.logger.Info("Storing tx", log.Stringable("tx", signedTx))
+	s.logger.Info("saving incoming transaction", log.Stringable("tx", signedTx))
 
 	txIdRaw := digest.CalcTxId(signedTx.Transaction())
 	return txPool.Put(txIdRaw, signedTx.Raw())
 }
 
-func (s *storage) ProcessIncomingTransactions(ctx context.Context, f TxProcessor) error {
+func (s *storage) ProcessIncomingTransactions(ctx context.Context, batchSize uint, f TxProcessor) error {
+	if batchSize == 0 {
+		return errors.New("batch size is 0")
+	}
+
 	for {
+		select {
+		case <-ctx.Done():
+			break
+		default:
+
+		}
+
 		tx, err := s.db.Begin(true)
 		if err != nil {
 			return err
 		}
-
 		txPool, err := tx.CreateBucketIfNotExists([]byte(INCOMING_TRANSACTIONS))
 		if err != nil {
 			return err
 		}
 
-		i := txPool.Cursor()
+		incomingTransactions := s.readIncomingTransactionsBatch(txPool, batchSize)
 
-		// FIXME read in batches
-		txIdRaw, signedTxRaw := i.First()
-		for ; len(txIdRaw) != 0; txIdRaw, signedTxRaw = i.Next() {
-			select {
-			case <-ctx.Done():
-				break
-			default:
-
-			}
-
-			signedTx := protocol.SignedTransactionReader(signedTxRaw)
-
-			if status, err := f(txIdRaw, signedTx); err == nil && isProcessed(status) {
-				if err := s.storeProcessedTransaction(tx, txIdRaw, signedTx); err != nil {
+		for txId, status := range f(incomingTransactions) {
+			if err == nil && isProcessed(status) {
+				txIdRaw, _ := encoding.DecodeHex(txId)
+				if err := s.storeProcessedTransaction(tx, txIdRaw, incomingTransactions[txId]); err != nil {
 					return err
 				}
 
@@ -124,6 +126,19 @@ func (s *storage) ProcessIncomingTransactions(ctx context.Context, f TxProcessor
 
 		return tx.Commit()
 	}
+}
+
+func (s *storage) readIncomingTransactionsBatch(txPool *bolt.Bucket, batchSize uint) (incomingTransactions map[string]*protocol.SignedTransaction) {
+	incomingTransactions = make(map[string]*protocol.SignedTransaction)
+	cursor := txPool.Cursor()
+
+	txIdRaw, signedTxRaw := cursor.First()
+	for i := uint(0); len(txIdRaw) != 0 && i < batchSize; i++ {
+		incomingTransactions[encoding.EncodeHex(txIdRaw)] = protocol.SignedTransactionReader(signedTxRaw)
+		txIdRaw, signedTxRaw = cursor.Next()
+	}
+
+	return incomingTransactions
 }
 
 func (s *storage) storeProcessedTransaction(tx *bolt.Tx, txId []byte, signedTx *protocol.SignedTransaction) error {

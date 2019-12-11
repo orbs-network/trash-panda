@@ -42,8 +42,10 @@ func startTrashPanda(ctx context.Context, transport transport.Transport) string 
 		Endpoints: []string{
 			GAMMA_ENDPOINT,
 		},
-		VirtualChains: []uint32{GAMMA_VCHAIN},
-		Gamma:         true,
+		VirtualChains:   []uint32{GAMMA_VCHAIN},
+		Gamma:           true,
+		RelayIntervalMs: 100,
+		RelayBatchSize:  10,
 	})
 	return endpoint
 }

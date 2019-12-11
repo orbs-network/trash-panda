@@ -8,8 +8,11 @@ type Config struct {
 	HttpAddress       string
 	Gamma             bool
 	Endpoints         []string
-	EndpointTimeoutMs int // milliseconds
+	EndpointTimeoutMs uint // milliseconds
 	VirtualChains     []uint32
+
+	RelayIntervalMs uint
+	RelayBatchSize  uint
 }
 
 var defaultConfig = Config{
@@ -17,6 +20,9 @@ var defaultConfig = Config{
 	VirtualChains:     []uint32{42},
 	HttpAddress:       "localhost:9876",
 	EndpointTimeoutMs: 60000,
+
+	RelayIntervalMs: 100,
+	RelayBatchSize:  100,
 }
 
 func Parse(input []byte) (*Config, error) {
@@ -37,6 +43,14 @@ func Parse(input []byte) (*Config, error) {
 
 	if cfg.EndpointTimeoutMs == 0 {
 		cfg.EndpointTimeoutMs = defaultConfig.EndpointTimeoutMs
+	}
+
+	if cfg.RelayIntervalMs == 0 {
+		cfg.RelayIntervalMs = defaultConfig.RelayIntervalMs
+	}
+
+	if cfg.RelayBatchSize == 0 {
+		cfg.RelayBatchSize = defaultConfig.RelayBatchSize
 	}
 
 	return cfg, err
