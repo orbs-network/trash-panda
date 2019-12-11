@@ -33,7 +33,10 @@ func TestStorage_StoreIncomingTransaction(t *testing.T) {
 		"Music1974", "getAlbum", "Diamond Dogs")
 	require.NoError(t, err)
 
-	s, err := NewStorageForChain(config.GetLogger(), "./", GAMMA_VCHAIN, false)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s, err := NewStorageForChain(ctx, config.GetLogger(), "./", GAMMA_VCHAIN, false)
 	require.NoError(t, err)
 
 	signedTx := client.SendTransactionRequestReader(tx).SignedTransaction()
@@ -51,7 +54,10 @@ func TestStorage_ProcessIncomingTransactions(t *testing.T) {
 		"Music1974", "getAlbum", "Diamond Dogs")
 	require.NoError(t, err)
 
-	s, err := NewStorageForChain(config.GetLogger(), "./", GAMMA_VCHAIN, false)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s, err := NewStorageForChain(ctx, config.GetLogger(), "./", GAMMA_VCHAIN, false)
 	require.NoError(t, err)
 
 	signedTx := client.SendTransactionRequestReader(tx).SignedTransaction()
@@ -80,7 +86,7 @@ func TestStorage_WaitForShutdown(t *testing.T) {
 	removeDB()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	s, err := NewStorageForChain(config.GetLogger(), "./", GAMMA_VCHAIN, false)
+	s, err := NewStorageForChain(ctx, config.GetLogger(), "./", GAMMA_VCHAIN, false)
 	require.NoError(t, err)
 
 	account, _ := orbs.CreateAccount()
@@ -105,7 +111,6 @@ func TestStorage_WaitForShutdown(t *testing.T) {
 		}
 	}()
 
-	s.WaitForShutdown(ctx)
 	time.Sleep(1 * time.Second)
 
 	cancel()

@@ -29,12 +29,11 @@ func NewTrashPanda(ctx context.Context, transport transport.Transport, cfg *conf
 			Endpoints:      cfg.Endpoints,
 		}
 
-		s, err := storage.NewStorageForChain(logger, "./", vcid, false)
+		s, err := storage.NewStorageForChain(ctx, logger, "./", vcid, false)
 		if err != nil {
 			// FIXME error handling
 			panic(err)
 		}
-		s.WaitForShutdown(ctx)
 
 		p := proxy.NewService(proxyConfig, s, transport, logger)
 		p.UpdateRoutes(server)

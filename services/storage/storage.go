@@ -18,7 +18,6 @@ type Storage interface {
 	StoreIncomingTransaction(signedTx *protocol.SignedTransaction) error
 	ProcessIncomingTransactions(ctx context.Context, f TxProcessor) error
 	Shutdown() error
-	WaitForShutdown(ctx context.Context)
 }
 
 type storage struct {
@@ -30,7 +29,7 @@ const INCOMING_TRANSACTIONS = "incoming"
 const PROCESSED_TRANSACTIONS = "processed"
 const TRANSACTION_STATUS = "status"
 
-func NewStorage(logger log.Logger, dataSource string, readOnly bool) (Storage, error) {
+func NewStorage(ctx context.Context, logger log.Logger, dataSource string, readOnly bool) (Storage, error) {
 	boltDb, err := bolt.Open(dataSource, 0600, &bolt.Options{
 		Timeout:  1 * time.Second,
 		ReadOnly: readOnly,
@@ -39,14 +38,17 @@ func NewStorage(logger log.Logger, dataSource string, readOnly bool) (Storage, e
 		return nil, err
 	}
 
-	return &storage{
+	storage := &storage{
 		logger,
 		boltDb,
-	}, nil
+	}
+	storage.waitForShutdown(ctx)
+
+	return storage, nil
 }
 
-func NewStorageForChain(logger log.Logger, dbPath string, vcid uint32, readOnly bool) (Storage, error) {
-	return NewStorage(logger, fmt.Sprintf("%s/vchain-%d.bolt", dbPath, vcid), readOnly)
+func NewStorageForChain(ctx context.Context, logger log.Logger, dbPath string, vcid uint32, readOnly bool) (Storage, error) {
+	return NewStorage(ctx, logger, fmt.Sprintf("%s/vchain-%d.bolt", dbPath, vcid), readOnly)
 }
 
 func (s *storage) StoreIncomingTransaction(signedTx *protocol.SignedTransaction) error {
@@ -159,7 +161,7 @@ func (s *storage) Shutdown() (err error) {
 	return
 }
 
-func (s *storage) WaitForShutdown(ctx context.Context) {
+func (s *storage) waitForShutdown(ctx context.Context) {
 	govnr.Once(config.NewErrorHandler(s.logger), func() {
 		select {
 		case <-ctx.Done():
