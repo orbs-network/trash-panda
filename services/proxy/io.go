@@ -1,18 +1,11 @@
 package proxy
 
 import (
-	"errors"
 	"github.com/orbs-network/membuffers/go"
 	"github.com/orbs-network/scribe/log"
 	"io/ioutil"
 	"net/http"
 )
-
-type HttpErr struct {
-	Code     int
-	LogField *log.Field
-	Message  string
-}
 
 func (s *service) writeMembuffResponse(w http.ResponseWriter, message membuffers.Message, httpCode int, errorForVerbosity error) {
 	w.Header().Set("Content-Type", "application/membuffers")
@@ -51,12 +44,4 @@ func readInput(r *http.Request) ([]byte, *HttpErr) {
 		return nil, &HttpErr{http.StatusBadRequest, log.Error(err), "http request body is empty"}
 	}
 	return bytes, nil
-}
-
-func (e *HttpErr) ToError() error {
-	if e.Message != "" {
-		return errors.New(e.Message)
-	}
-
-	return nil
 }

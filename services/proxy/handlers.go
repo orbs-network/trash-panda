@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"github.com/orbs-network/membuffers/go"
+	"github.com/orbs-network/orbs-spec/types/go/protocol/client"
 	"github.com/orbs-network/scribe/log"
 	"github.com/orbs-network/trash-panda/transport"
 	"net/http"
@@ -78,9 +79,44 @@ func (h *handler) Handle(data []byte) (input membuffers.Message, output membuffe
 	return h.f(h, data)
 }
 
-func validate(m membuffers.Message) *HttpErr {
-	if !m.IsValid() {
-		return &HttpErr{http.StatusBadRequest, log.Stringable("request", m), "http request is not a valid membuffer"}
+func (s *service) wrapHandler(h Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bytes, e := readInput(r)
+		if e != nil {
+			s.writeErrorResponseAndLog(w, e)
+			return
+		}
+		input, output, err := h.Handle(bytes)
+
+		if err := s.storeInput(input); err != nil {
+			s.logger.Error("failed to store incoming transaction", log.Error(err))
+		}
+
+		if output != nil {
+			s.logger.Info("responded with", log.Stringable("response", output))
+			s.writeMembuffResponse(w, output, err.Code, nil)
+		} else {
+			s.logger.Error("error occurred", err.LogField)
+			s.writeErrorResponseAndLog(w, err)
+		}
 	}
+}
+
+func (s *service) storeInput(message membuffers.Message) error {
+	switch message.(type) {
+	case *client.SendTransactionRequest:
+		return s.storage.StoreIncomingTransaction(message.(*client.SendTransactionRequest).SignedTransaction())
+	}
+
+	return nil
+}
+
+func (s *service) findHandler(name string) Handler {
+	for _, h := range s.handlers {
+		if h.Name() == name {
+			return h
+		}
+	}
+
 	return nil
 }
