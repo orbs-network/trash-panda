@@ -1,10 +1,13 @@
 package storage
 
 import (
+	"context"
 	"fmt"
+	"github.com/orbs-network/govnr"
 	"github.com/orbs-network/orbs-client-sdk-go/crypto/digest"
 	"github.com/orbs-network/orbs-spec/types/go/protocol"
 	"github.com/orbs-network/scribe/log"
+	"github.com/orbs-network/trash-panda/config"
 	bolt "go.etcd.io/bbolt"
 	"time"
 )
@@ -13,8 +16,9 @@ type TxProcessor func(txId []byte, incomingTransaction *protocol.SignedTransacti
 
 type Storage interface {
 	StoreIncomingTransaction(signedTx *protocol.SignedTransaction) error
-	ProcessIncomingTransactions(f TxProcessor) error
+	ProcessIncomingTransactions(ctx context.Context, f TxProcessor) error
 	Shutdown() error
+	WaitForShutdown(ctx context.Context)
 }
 
 type storage struct {
@@ -28,7 +32,7 @@ const TRANSACTION_STATUS = "status"
 
 func NewStorage(logger log.Logger, dataSource string, readOnly bool) (Storage, error) {
 	boltDb, err := bolt.Open(dataSource, 0600, &bolt.Options{
-		Timeout:  5 * time.Second,
+		Timeout:  1 * time.Second,
 		ReadOnly: readOnly,
 	})
 	if err != nil {
@@ -77,7 +81,7 @@ func (s *storage) storeSignedTransaction(tx *bolt.Tx, pool string, signedTx *pro
 	return txPool.Put(txIdRaw, signedTx.Raw())
 }
 
-func (s *storage) ProcessIncomingTransactions(f TxProcessor) error {
+func (s *storage) ProcessIncomingTransactions(ctx context.Context, f TxProcessor) error {
 	for {
 		tx, err := s.db.Begin(true)
 		if err != nil {
@@ -94,6 +98,13 @@ func (s *storage) ProcessIncomingTransactions(f TxProcessor) error {
 		// FIXME read in batches
 		txIdRaw, signedTxRaw := i.First()
 		for ; len(txIdRaw) != 0; txIdRaw, signedTxRaw = i.Next() {
+			select {
+			case <-ctx.Done():
+				break
+			default:
+
+			}
+
 			signedTx := protocol.SignedTransactionReader(signedTxRaw)
 
 			if status, err := f(txIdRaw, signedTx); err == nil && isProcessed(status) {
@@ -135,18 +146,26 @@ func (s *storage) storeProcessedTransactionStatus(tx *bolt.Tx, txId []byte, stat
 }
 
 func (s *storage) Shutdown() (err error) {
-	// FIXME proper shutdown
 	if err = s.db.Sync(); err != nil {
-		s.logger.Error("failed to synchronize storage on shutdown")
+		s.logger.Error("failed to synchronize storage on shutdown", log.Error(err))
 	}
 
 	if err = s.db.Close(); err != nil {
-		s.logger.Error("failed to close storage on shutdown")
+		s.logger.Error("failed to close storage on shutdown", log.Error(err))
 	}
 
 	s.logger.Info("storage shut down")
 
 	return
+}
+
+func (s *storage) WaitForShutdown(ctx context.Context) {
+	govnr.Once(config.NewErrorHandler(s.logger), func() {
+		select {
+		case <-ctx.Done():
+			s.Shutdown()
+		}
+	})
 }
 
 func isProcessed(status protocol.TransactionStatus) bool {

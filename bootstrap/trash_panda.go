@@ -34,6 +34,7 @@ func NewTrashPanda(ctx context.Context, transport transport.Transport, cfg *conf
 			// FIXME error handling
 			panic(err)
 		}
+		s.WaitForShutdown(ctx)
 
 		p := proxy.NewService(proxyConfig, s, transport, logger)
 		p.UpdateRoutes(server)

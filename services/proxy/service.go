@@ -52,7 +52,7 @@ func (s *service) RelayTransactions(ctx context.Context) {
 	sendTxHandler := s.findHandler("send-transaction")
 
 	handle := govnr.Forever(ctx, "http server", config.NewErrorHandler(s.logger), func() {
-		s.storage.ProcessIncomingTransactions(func(txId []byte, signedTransaction *protocol.SignedTransaction) (protocol.TransactionStatus, error) {
+		s.storage.ProcessIncomingTransactions(ctx, func(txId []byte, signedTransaction *protocol.SignedTransaction) (protocol.TransactionStatus, error) {
 			_, output, err := sendTxHandler.Handle((&client.SendTransactionRequestBuilder{
 				SignedTransaction: protocol.SignedTransactionBuilderFromRaw(signedTransaction.Raw()),
 			}).Build().Raw())
