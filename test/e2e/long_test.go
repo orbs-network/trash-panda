@@ -17,7 +17,7 @@ import (
 )
 
 const MAX_BATCHES = 10
-const BATCH_SIZE = 50
+const BATCH_SIZE = 100
 const INTERVAL = 5 * time.Second
 
 const TESTNET_VCHAIN = 1003
@@ -39,6 +39,22 @@ func skipUnlessTestnet(t *testing.T) {
 	}
 }
 
+func getConfig(httpAddress string, vcid uint32) config.Config {
+	return config.Config{
+		HttpAddress:   httpAddress,
+		VirtualChains: []uint32{vcid},
+		Endpoints: []string{
+			DEMONET_NODE1,
+			DEMONET_NODE2,
+			DEMONET_NODE3,
+			DEMONET_NODE4,
+		},
+		EndpointTimeoutMs: 5000, // 5s
+		RelayIntervalMs:   1000,
+		RelayBatchSize:    100,
+	}
+}
+
 func Test_LongRun(t *testing.T) {
 	skipUnlessTestnet(t)
 
@@ -47,17 +63,7 @@ func Test_LongRun(t *testing.T) {
 
 	httpAddress, endpoint := getRandomAddressAndEnpoint(TESTNET_VCHAIN)
 
-	rawJSON, _ := json.Marshal(config.Config{
-		HttpAddress:   httpAddress,
-		VirtualChains: []uint32{TESTNET_VCHAIN},
-		Endpoints: []string{
-			DEMONET_NODE1,
-			DEMONET_NODE2,
-			DEMONET_NODE3,
-			DEMONET_NODE4,
-		},
-		EndpointTimeoutMs: 5000, // 5s
-	})
+	rawJSON, _ := json.Marshal(getConfig(httpAddress, TESTNET_VCHAIN))
 	ioutil.WriteFile(TEST_CONFIG, rawJSON, 0644)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -72,12 +78,11 @@ func Test_LongRun(t *testing.T) {
 
 	account, _ := orbs.CreateAccount()
 
-	contractName := deployIncrementContract(t, account, endpoint, TESTNET_VCHAIN)
+	contractName := deployIncrementContract(t, account, fmt.Sprintf("%s/vchains/%d", DEMONET_NODE1, TESTNET_VCHAIN), TESTNET_VCHAIN)
 	print(contractName)
 
 	client := orbs.NewClient(endpoint, TESTNET_VCHAIN, codec.NETWORK_TYPE_TEST_NET)
 
-	txSent := uint64(0)
 	for b := 0; b < MAX_BATCHES; b++ {
 		var wg sync.WaitGroup
 
@@ -86,13 +91,12 @@ func Test_LongRun(t *testing.T) {
 
 			go func(nonce uint32) {
 				rawTx, _, _ := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc", nonce)
-				fmt.Println(contractName, "inc", nonce)
+				//fmt.Println(contractName, "inc", nonce)
 				response, err := client.SendTransaction(rawTx)
 
 				var status = ""
 				if response != nil {
 					status = response.TransactionStatus.String()
-					txSent++
 				} else if err != nil {
 					status = err.Error()
 				}
@@ -114,9 +118,11 @@ func Test_LongRun(t *testing.T) {
 			return false
 		}
 
-		println("value: ", res.OutputArguments[0].(uint64), "/", txSent, "/", MAX_BATCHES*BATCH_SIZE)
-		return res.OutputArguments[0].(uint64) == txSent
+		println("value: ", res.OutputArguments[0].(uint64), "/", MAX_BATCHES*BATCH_SIZE)
+		return res.OutputArguments[0].(uint64) == MAX_BATCHES*BATCH_SIZE
 	}, 3*time.Minute, 1*time.Second)
+
+	<-time.After(3 * time.Minute)
 
 	m.stop()
 }
@@ -132,7 +138,7 @@ func NewMain(ctx context.Context) *main {
 }
 
 func (m *main) start() error {
-	m.cmd.Stdout = os.Stdout
+	//m.cmd.Stdout = os.Stdout
 	m.cmd.Stderr = os.Stderr
 
 	return m.cmd.Start()

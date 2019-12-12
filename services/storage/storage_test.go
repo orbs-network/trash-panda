@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -73,6 +74,9 @@ func TestStorage_GetIncomingTransactions(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, 2, len(incomingTransactions))
 
+	require.EqualValues(t, signedTx.Raw(), incomingTransactions[txId].Raw())
+	require.EqualValues(t, anotherSignedTx.Raw(), incomingTransactions[anotherTxId].Raw())
+
 	s.UpdateTransactionStatus(txId, protocol.TRANSACTION_STATUS_COMMITTED)
 	s.UpdateTransactionStatus(anotherTxId, protocol.TRANSACTION_STATUS_DUPLICATE_TRANSACTION_ALREADY_COMMITTED)
 
@@ -122,12 +126,14 @@ func TestStorage_WaitForShutdown(t *testing.T) {
 	boltDb.Close()
 }
 
-const MAX_TX = 500
+const MAX_TX = 100
 const BATCH_SIZE = 5
-const INSERT_INTEVAL = 3 * time.Millisecond
-const UPDATE_INTERVAL = 10 * time.Millisecond
+const INSERT_INTEVAL = 1 * time.Millisecond
+const UPDATE_INTERVAL = 2 * time.Millisecond
 
 func Test_Concurrency(t *testing.T) {
+	removeDB()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	s, err := NewStorageForChain(ctx, config.GetLogger(), "./", GAMMA_VCHAIN, false)
@@ -136,15 +142,21 @@ func Test_Concurrency(t *testing.T) {
 	account, _ := orbs.CreateAccount()
 	orbsClient := orbs.NewClient(GAMMA_ENDPOINT, GAMMA_VCHAIN, codec.NETWORK_TYPE_TEST_NET)
 
+	txProcessed := uint32(0)
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				break
+			default:
+
 			}
 			txs, _ := s.GetIncomingTransactions(context.Background(), BATCH_SIZE)
 			for txId, _ := range txs {
-				s.UpdateTransactionStatus(txId, protocol.TRANSACTION_STATUS_COMMITTED)
+				err := s.UpdateTransactionStatus(txId, protocol.TRANSACTION_STATUS_COMMITTED)
+				require.NoError(t, err)
+				txProcessed++
+				atomic.AddUint32(&txProcessed, 1)
 			}
 
 			<-time.After(UPDATE_INTERVAL)
@@ -152,14 +164,16 @@ func Test_Concurrency(t *testing.T) {
 	}()
 
 	go func() {
-		for {
+		for i := 0; i < MAX_TX; i++ {
 			select {
 			case <-ctx.Done():
 				break
+			default:
+
 			}
 
 			tx, _, err := orbsClient.CreateTransaction(account.PublicKey, account.PrivateKey,
-				"Music1974", "getAlbum", "Diamond Dogs")
+				"Music1974", "getAlbum", "Diamond Dogs", uint32(i))
 			require.NoError(t, err)
 
 			signedTx := client.SendTransactionRequestReader(tx).SignedTransaction()
@@ -171,11 +185,16 @@ func Test_Concurrency(t *testing.T) {
 	}()
 
 	require.Eventually(t, func() bool {
+		return txProcessed == MAX_TX
+	}, 2*time.Second, INSERT_INTEVAL)
+
+	require.Eventually(t, func() bool {
 		stats, err := s.Stats()
 		if err != nil {
 			return false
 		}
 
-		return stats.Total == stats.Incoming+stats.Processed
-	}, 10*time.Second, INSERT_INTEVAL)
+		return stats.Incoming == 0 && stats.Total == MAX_TX && stats.Total == stats.Processed
+	}, 2*time.Second, INSERT_INTEVAL)
+
 }

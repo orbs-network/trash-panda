@@ -73,64 +73,51 @@ func NewStorageForChain(ctx context.Context, logger log.Logger, dbPath string, v
 
 // FIXME probably shouldn't roll back ever?
 func (s *storage) StoreTransaction(signedTx *protocol.SignedTransaction, status protocol.TransactionStatus) error {
-	tx, err := s.db.Begin(true)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err != nil {
-			s.logger.Error("rolling back!")
-			tx.Rollback()
-		}
-	}()
-
-	txIdRaw := digest.CalcTxId(signedTx.Transaction())
-	if err := s.storeSignedTransaction(tx, txIdRaw, signedTx); err != nil {
-		return err
-	}
-
-	if err := s.updateTransactionStatus(tx, txIdRaw, status); err != nil {
-		return err
-	}
-
-	if !isProcessed(status) {
-		if err := s.putTransactionIntoQueue(tx, INCOMING, txIdRaw); err != nil {
+	return s.db.Batch(func(tx *bolt.Tx) error {
+		txIdRaw := digest.CalcTxId(signedTx.Transaction())
+		if err := s.storeSignedTransaction(tx, txIdRaw, signedTx); err != nil {
 			return err
-		}
-	}
-
-	return tx.Commit()
-}
-
-func (s *storage) UpdateTransactionStatus(txId string, status protocol.TransactionStatus) error {
-	tx, err := s.db.Begin(true)
-	if err != nil {
-		return err
-	}
-
-	if isProcessed(status) {
-		txIdRaw, _ := encoding.DecodeHex(txId)
-		if err := s.removeTransactionFromQueue(tx, INCOMING, txIdRaw); err != nil {
-			return tx.Rollback()
-		}
-
-		if err := s.putTransactionIntoQueue(tx, PROCESSED, txIdRaw); err != nil {
-			return tx.Rollback()
 		}
 
 		if err := s.updateTransactionStatus(tx, txIdRaw, status); err != nil {
-			return tx.Rollback()
+			return err
 		}
-	}
 
-	return tx.Commit()
+		if !isProcessed(status) {
+			if err := s.putTransactionIntoQueue(tx, INCOMING, txIdRaw); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+func (s *storage) UpdateTransactionStatus(txId string, status protocol.TransactionStatus) error {
+	return s.db.Batch(func(tx *bolt.Tx) error {
+		if isProcessed(status) {
+			txIdRaw, _ := encoding.DecodeHex(txId)
+			if err := s.removeTransactionFromQueue(tx, INCOMING, txIdRaw); err != nil {
+				return err
+			}
+
+			if err := s.putTransactionIntoQueue(tx, PROCESSED, txIdRaw); err != nil {
+				return err
+			}
+
+			if err := s.updateTransactionStatus(tx, txIdRaw, status); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }
 
 func (s *storage) storeSignedTransaction(tx *bolt.Tx, txIdRaw []byte, signedTx *protocol.SignedTransaction) error {
 	queueBucket := tx.Bucket([]byte(TRANSACTIONS))
 
-	s.logger.Info("saving transaction", log.Stringable("tx", signedTx))
+	s.logger.Info("saving transaction", log.String("txId", encoding.EncodeHex(txIdRaw)))
 	return queueBucket.Put(txIdRaw, signedTx.Raw())
 }
 

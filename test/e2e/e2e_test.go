@@ -33,7 +33,7 @@ func Test_SendTransaction(t *testing.T) {
 
 		contractName := deployIncrementContractToGamma(t)
 
-		tx, txId, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc")
+		tx, txId, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc", uint32(0))
 		require.NoError(t, err)
 
 		res, err := client.SendTransaction(tx)
@@ -55,7 +55,7 @@ func Test_SendTransactionAsync(t *testing.T) {
 
 		contractName := deployIncrementContractToGamma(t)
 
-		tx, txId, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc")
+		tx, txId, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc", uint32(0))
 		require.NoError(t, err)
 
 		res, err := client.SendTransactionAsync(tx)
@@ -83,7 +83,7 @@ func Test_Relay(t *testing.T) {
 	account, _ := orbs.CreateAccount()
 	client := orbs.NewClient(endpoint, GAMMA_VCHAIN, codec.NETWORK_TYPE_TEST_NET)
 
-	tx, txId, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc")
+	tx, txId, err := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc", uint32(0))
 	require.NoError(t, err)
 
 	fakeTransport.Off()

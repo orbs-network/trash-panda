@@ -17,13 +17,11 @@ type Config struct {
 
 type httpTransport struct {
 	config Config
-	rand   *rand.Rand
 }
 
 func NewHttpTransport(config Config) Transport {
 	return &httpTransport{
 		config: config,
-		rand:   rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -78,5 +76,6 @@ func (t *httpTransport) SendRandom(endpoints []string, path string, payload []by
 }
 
 func (t *httpTransport) getRandomEndpoint(endpoints []string) string {
-	return endpoints[t.rand.Intn(len(endpoints))]
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return endpoints[random.Intn(len(endpoints))]
 }
