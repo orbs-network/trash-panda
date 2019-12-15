@@ -17,14 +17,26 @@ func runQuery(h *handler, data []byte) (input membuffers.Message, output membuff
 	h.logger.Info("received request", log.Stringable("request", input))
 
 	shuffledEndpoints := h.getShuffledEndpoints()
-	res, resBody, e := h.transport.Send(shuffledEndpoints[0], h.path, data)
-	if e != nil {
-		return input, nil, &HttpErr{http.StatusBadRequest, log.Error(e), e.Error()}
-	}
+	response := filterResponses(aggregateRequest(3, shuffledEndpoints, func(endpoint string) response {
+		res, resBody, e := h.transport.Send(shuffledEndpoints[0], h.path, data)
+		if e != nil {
+			return response{
+				httpErr: &HttpErr{http.StatusBadRequest, log.Error(e), e.Error()},
+			}
+		}
 
-	if res.StatusCode != http.StatusOK {
-		return input, nil, &HttpErr{res.StatusCode, log.Error(errors.New(res.Status)), res.Header.Get("X-ORBS-ERROR-DETAILS")}
-	}
+		if res.StatusCode != http.StatusOK {
+			return response{
+				httpErr: &HttpErr{res.StatusCode, log.Error(errors.New(res.Status)), res.Header.Get("X-ORBS-ERROR-DETAILS")},
+			}
+		}
 
-	return input, client.RunQueryResponseReader(resBody), &HttpErr{Code: res.StatusCode}
+		reader := client.RunQueryResponseReader(resBody)
+		return response{
+			output:      reader,
+			httpErr:     &HttpErr{Code: res.StatusCode},
+			blockHeight: uint64(reader.RequestResult().BlockHeight()),
+		}
+	}))
+	return input, response.output, response.httpErr
 }

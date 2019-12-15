@@ -8,6 +8,7 @@ import (
 	"github.com/orbs-network/trash-panda/transport"
 	"math/rand"
 	"net/http"
+	"sort"
 	"time"
 )
 
@@ -140,4 +141,32 @@ func (s *service) findHandler(name string) Handler {
 	}
 
 	return nil
+}
+
+func aggregateRequest(times int, endpoints []string, request func(endpoint string) response) []response {
+	var results []response
+
+	maxTimes := times
+	if maxTimes > len(endpoints) {
+		maxTimes = len(endpoints)
+	}
+	for i := 0; i < maxTimes; i++ {
+		results = append(results, request(endpoints[i]))
+	}
+
+	return results
+}
+
+func filterResponses(responses []response) response {
+	sort.Slice(responses, func(i, j int) bool {
+		return responses[i].blockHeight > responses[j].blockHeight
+	})
+
+	return responses[0]
+}
+
+type response struct {
+	output      membuffers.Message
+	httpErr     *HttpErr
+	blockHeight uint64
 }
