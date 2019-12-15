@@ -6,7 +6,9 @@ import (
 	"github.com/orbs-network/orbs-spec/types/go/protocol/client"
 	"github.com/orbs-network/scribe/log"
 	"github.com/orbs-network/trash-panda/transport"
+	"math/rand"
 	"net/http"
+	"time"
 )
 
 type Handler interface {
@@ -78,6 +80,17 @@ func (h *handler) Path() string {
 
 func (h *handler) Handle(data []byte) (input membuffers.Message, output membuffers.Message, err *HttpErr) {
 	return h.f(h, data)
+}
+
+func (h *handler) getShuffledEndpoints() []string {
+	shuffled := make([]string, len(h.config.Endpoints))
+	copy(shuffled, h.config.Endpoints)
+
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+	random.Shuffle(len(shuffled), func(i, j int) {
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+	})
+	return shuffled
 }
 
 func (s *service) wrapHandler(h Handler) http.HandlerFunc {
