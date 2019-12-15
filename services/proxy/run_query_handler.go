@@ -17,7 +17,7 @@ func runQuery(h *handler, data []byte) (input membuffers.Message, output membuff
 	h.logger.Info("received request", log.Stringable("request", input))
 
 	shuffledEndpoints := h.getShuffledEndpoints()
-	response := filterResponses(aggregateRequest(3, shuffledEndpoints, func(endpoint string) response {
+	response := filterResponsesByBlockHeight(aggregateRequest(REQUEST_ATTEMPTS, shuffledEndpoints, func(endpoint string) response {
 		res, resBody, e := h.transport.Send(shuffledEndpoints[0], h.path, data)
 		if e != nil {
 			return response{
@@ -33,9 +33,9 @@ func runQuery(h *handler, data []byte) (input membuffers.Message, output membuff
 
 		reader := client.RunQueryResponseReader(resBody)
 		return response{
-			output:      reader,
-			httpErr:     &HttpErr{Code: res.StatusCode},
-			blockHeight: uint64(reader.RequestResult().BlockHeight()),
+			output:        reader,
+			httpErr:       &HttpErr{Code: res.StatusCode},
+			requestResult: reader.RequestResult(),
 		}
 	}))
 	return input, response.output, response.httpErr

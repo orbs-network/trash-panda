@@ -143,6 +143,8 @@ func (s *service) findHandler(name string) Handler {
 	return nil
 }
 
+const REQUEST_ATTEMPTS = 3
+
 func aggregateRequest(times int, endpoints []string, request func(endpoint string) response) []response {
 	var results []response
 
@@ -157,16 +159,30 @@ func aggregateRequest(times int, endpoints []string, request func(endpoint strin
 	return results
 }
 
-func filterResponses(responses []response) response {
+func filterResponses(responses []response, less func(i, j *client.RequestResult) bool) response {
 	sort.Slice(responses, func(i, j int) bool {
-		return responses[i].blockHeight > responses[j].blockHeight
+		if responses[i].requestResult == nil && responses[j].requestResult != nil {
+			return false
+		} else if responses[i].requestResult != nil && responses[j].requestResult == nil {
+			return true
+		} else if responses[i].requestResult == nil && responses[j].requestResult == nil {
+			return true
+		}
+
+		return less(responses[i].requestResult, responses[j].requestResult)
 	})
 
 	return responses[0]
 }
 
+func filterResponsesByBlockHeight(responses []response) response {
+	return filterResponses(responses, func(i, j *client.RequestResult) bool {
+		return i.BlockHeight() > j.BlockHeight()
+	})
+}
+
 type response struct {
-	output      membuffers.Message
-	httpErr     *HttpErr
-	blockHeight uint64
+	output        membuffers.Message
+	httpErr       *HttpErr
+	requestResult *client.RequestResult
 }

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"github.com/orbs-network/orbs-spec/types/go/protocol/client"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -12,19 +13,18 @@ func Test_aggregateAndFilter(t *testing.T) {
 		switch endpoint {
 		case "b":
 			return response{
-				blockHeight: 3,
+				requestResult: (&client.RequestResultBuilder{BlockHeight: 3}).Build(),
 			}
 		case "c":
 			return response{
-				blockHeight: 4,
+				requestResult: (&client.RequestResultBuilder{BlockHeight: 4}).Build(),
 			}
 		case "d":
 			return response{
-				blockHeight: 4,
+				requestResult: (&client.RequestResultBuilder{BlockHeight: 4}).Build(),
 			}
 		default:
 			return response{
-				blockHeight: 0,
 				httpErr: &HttpErr{
 					Message: "timeout",
 				},
@@ -34,11 +34,11 @@ func Test_aggregateAndFilter(t *testing.T) {
 
 	require.Len(t, results, 4)
 
-	require.EqualValues(t, 0, results[0].blockHeight)
-	require.EqualValues(t, 3, results[1].blockHeight)
-	require.EqualValues(t, 4, results[2].blockHeight)
-	require.EqualValues(t, 4, results[3].blockHeight)
+	require.Nil(t, results[0].requestResult)
+	require.EqualValues(t, 3, results[1].requestResult.BlockHeight())
+	require.EqualValues(t, 4, results[2].requestResult.BlockHeight())
+	require.EqualValues(t, 4, results[3].requestResult.BlockHeight())
 
-	result := filterResponses(results)
-	require.EqualValues(t, 4, result.blockHeight)
+	result := filterResponsesByBlockHeight(results)
+	require.EqualValues(t, 4, result.requestResult.BlockHeight())
 }
