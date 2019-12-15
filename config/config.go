@@ -35,13 +35,15 @@ func Parse(input []byte) (*Config, error) {
 
 func mergeWithDefaults(input []byte) (*Config, error) {
 	cfg := make(map[string]interface{})
-	if err := json.Unmarshal(input, cfg); err != nil {
+	if err := json.Unmarshal(input, &cfg); err != nil {
 		return nil, err
 	}
 
 	rawDefaults, _ := json.Marshal(defaultConfig)
 	defaultCfg := make(map[string]interface{})
-	json.Unmarshal(rawDefaults, defaultCfg)
+	if err := json.Unmarshal(rawDefaults, &defaultCfg); err != nil {
+		return nil, err
+	}
 
 	for k, v := range defaultCfg {
 		if _, found := cfg[k]; !found {

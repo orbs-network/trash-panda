@@ -9,12 +9,16 @@ import (
 	"github.com/orbs-network/trash-panda/config"
 	"github.com/orbs-network/trash-panda/transport"
 	"io/ioutil"
+	"os"
 	"time"
 )
 
 func main() {
+	logger := config.GetLogger()
+
 	configPath := flag.String("config", "./config.json", "path to config")
 	showVersion := flag.Bool("version", false, "")
+	showConfig := flag.Bool("show-config", false, "")
 	flag.Parse()
 
 	if *showVersion {
@@ -24,15 +28,21 @@ func main() {
 
 	configData, err := ioutil.ReadFile(*configPath)
 	if err != nil {
-		panic(configData)
+		logger.Error("config file not found", log.Error(err))
+		os.Exit(1)
 	}
 
 	cfg, err := config.Parse(configData)
 	if err != nil {
-		panic(err)
+		logger.Error("could not parse config file", log.Error(err))
+		os.Exit(1)
 	}
 
-	logger := config.GetLogger()
+	if *showConfig {
+		fmt.Printf("%+v", *cfg)
+		return
+	}
+
 	logger.Info("starting indexer service")
 
 	ctx, cancel := context.WithCancel(context.Background())
