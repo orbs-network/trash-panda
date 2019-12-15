@@ -6,7 +6,6 @@ import (
 	"github.com/orbs-network/orbs-client-sdk-go/orbs"
 	"github.com/pkg/errors"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"time"
 )
@@ -65,17 +64,4 @@ func (t *httpTransport) Send(endpoint string, path string, payload []byte) (*htt
 	}
 
 	return res, buf, nil
-}
-
-func (t *httpTransport) SendRandom(endpoints []string, path string, payload []byte) (*http.Response, []byte, error) {
-	if len(endpoints) == 0 {
-		return nil, nil, errors.New("no endpoints were provided to HttpTransport")
-	}
-
-	return t.Send(t.getRandomEndpoint(endpoints), path, payload)
-}
-
-func (t *httpTransport) getRandomEndpoint(endpoints []string) string {
-	random := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return endpoints[random.Intn(len(endpoints))]
 }

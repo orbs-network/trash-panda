@@ -30,10 +30,6 @@ func (t *MockTransport) Send(endpoint string, path string, payload []byte) (*htt
 	return nil, nil, errors.New("failed to send payload")
 }
 
-func (t *MockTransport) SendRandom(endpoints []string, path string, payload []byte) (*http.Response, []byte, error) {
-	return t.Send(endpoints[0], path, payload)
-}
-
 func (t *MockTransport) On() {
 	t.on = true
 }

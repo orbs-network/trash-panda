@@ -6,7 +6,10 @@ import (
 	"github.com/orbs-network/orbs-spec/types/go/protocol/client"
 	"github.com/orbs-network/scribe/log"
 	"github.com/orbs-network/trash-panda/transport"
+	"math/rand"
 	"net/http"
+	"sort"
+	"time"
 )
 
 type Handler interface {
@@ -80,6 +83,17 @@ func (h *handler) Handle(data []byte) (input membuffers.Message, output membuffe
 	return h.f(h, data)
 }
 
+func (h *handler) getShuffledEndpoints() []string {
+	shuffled := make([]string, len(h.config.Endpoints))
+	copy(shuffled, h.config.Endpoints)
+
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+	random.Shuffle(len(shuffled), func(i, j int) {
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+	})
+	return shuffled
+}
+
 func (s *service) wrapHandler(h Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bytes, e := readInput(r)
@@ -127,4 +141,48 @@ func (s *service) findHandler(name string) Handler {
 	}
 
 	return nil
+}
+
+const REQUEST_ATTEMPTS = 3
+
+func aggregateRequest(times int, endpoints []string, request func(endpoint string) response) []response {
+	var results []response
+
+	maxTimes := times
+	if maxTimes > len(endpoints) {
+		maxTimes = len(endpoints)
+	}
+	for i := 0; i < maxTimes; i++ {
+		results = append(results, request(endpoints[i]))
+	}
+
+	return results
+}
+
+func filterResponses(responses []response, less func(i, j *client.RequestResult) bool) response {
+	sort.Slice(responses, func(i, j int) bool {
+		if responses[i].requestResult == nil && responses[j].requestResult != nil {
+			return false
+		} else if responses[i].requestResult != nil && responses[j].requestResult == nil {
+			return true
+		} else if responses[i].requestResult == nil && responses[j].requestResult == nil {
+			return true
+		}
+
+		return less(responses[i].requestResult, responses[j].requestResult)
+	})
+
+	return responses[0]
+}
+
+func filterResponsesByBlockHeight(responses []response) response {
+	return filterResponses(responses, func(i, j *client.RequestResult) bool {
+		return i.BlockHeight() > j.BlockHeight()
+	})
+}
+
+type response struct {
+	output        membuffers.Message
+	httpErr       *HttpErr
+	requestResult *client.RequestResult
 }
