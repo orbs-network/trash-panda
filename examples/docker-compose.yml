@@ -1,0 +1,18 @@
+version: "3"
+
+services:
+  trashpanda:
+    image: orbsnetwork/trash-panda:v0.1.0
+    ports:
+      - "9876:9876"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    volumes:
+      - ./efs/trashpanda/db:/opt/orbs/db
+      - ./trashpanda.config.json:/opt/orbs/config.json
+
+#  proxy:
+#    image: nginx
