@@ -1,5 +1,5 @@
 {
-  "HttpAddress": "localhost:9876",
+  "HttpAddress": "0.0.0.0:9876",
   "VirtualChains": [
     1000,
     1003,
