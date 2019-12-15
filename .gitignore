@@ -2,3 +2,4 @@
 orbs-test-keys.json
 *.bolt
 config.test.json
+_bin

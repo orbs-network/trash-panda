@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"github.com/orbs-network/scribe/log"
 	"github.com/orbs-network/trash-panda/bootstrap"
 	"github.com/orbs-network/trash-panda/config"
@@ -12,11 +13,14 @@ import (
 )
 
 func main() {
-	logger := config.GetLogger()
-	logger.Info("starting indexer service")
-
 	configPath := flag.String("config", "./config.json", "path to config")
+	showVersion := flag.Bool("version", false, "")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(config.GetVersion().String())
+		return
+	}
 
 	configData, err := ioutil.ReadFile(*configPath)
 	if err != nil {
@@ -27,6 +31,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	logger := config.GetLogger()
+	logger.Info("starting indexer service")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

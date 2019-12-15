@@ -16,9 +16,9 @@ import (
 	"time"
 )
 
-const MAX_BATCHES = 10
-const BATCH_SIZE = 100
-const INTERVAL = 5 * time.Second
+const MAX_BATCHES = 100
+const BATCH_SIZE = 300
+const INTERVAL = 1 * time.Second
 
 const TESTNET_VCHAIN = 1003
 
@@ -92,7 +92,7 @@ func Test_LongRun(t *testing.T) {
 			go func(nonce uint32) {
 				rawTx, _, _ := client.CreateTransaction(account.PublicKey, account.PrivateKey, contractName, "inc", nonce)
 				//fmt.Println(contractName, "inc", nonce)
-				response, err := client.SendTransaction(rawTx)
+				response, err := client.SendTransactionAsync(rawTx)
 
 				var status = ""
 				if response != nil {

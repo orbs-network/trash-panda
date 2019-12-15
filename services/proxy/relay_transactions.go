@@ -50,7 +50,7 @@ func (s *service) RelayTransactions(ctx context.Context) {
 		close(statusCH)
 
 		stats, _ := s.storage.Stats()
-		//println(fmt.Sprintf("%+v", stats), attempts)
+		println(fmt.Sprintf("%+v", stats), attempts)
 		s.logger.Info("relay tick stats",
 			log.Int("incoming", stats.Incoming),
 			log.Int("processed", stats.Processed),
