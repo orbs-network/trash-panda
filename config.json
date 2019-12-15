@@ -1,4 +1,4 @@
 {
-  "HttpAddress": "localhost:8976",
+  "HttpAddress": "localhost:9876",
   "VirtualChains": [42]
 }

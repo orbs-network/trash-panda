@@ -46,6 +46,7 @@ func startTrashPanda(ctx context.Context, transport transport.Transport) string 
 		Gamma:           true,
 		RelayIntervalMs: 100,
 		RelayBatchSize:  10,
+		Database:        "./",
 	})
 	return endpoint
 }

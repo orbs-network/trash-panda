@@ -19,7 +19,7 @@ func NewTrashPanda(ctx context.Context, transport transport.Transport, cfg *conf
 	for _, vcid := range cfg.VirtualChains {
 		proxyConfig := buildProxyConfig(cfg, vcid)
 
-		s, err := storage.NewStorageForChain(ctx, logger, "./", vcid, false)
+		s, err := storage.NewStorageForChain(ctx, logger, cfg.Database, vcid, false)
 		if err != nil {
 			// FIXME error handling
 			panic(err)

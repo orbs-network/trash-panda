@@ -13,6 +13,8 @@ type Config struct {
 
 	RelayIntervalMs uint
 	RelayBatchSize  uint
+
+	Database string
 }
 
 var defaultConfig = Config{
@@ -23,35 +25,33 @@ var defaultConfig = Config{
 
 	RelayIntervalMs: 1000,
 	RelayBatchSize:  100,
+
+	Database: "./db/",
 }
 
 func Parse(input []byte) (*Config, error) {
-	cfg := &Config{}
-	err := json.Unmarshal(input, cfg)
+	return mergeWithDefaults(input)
+}
 
-	if len(cfg.VirtualChains) == 0 {
-		cfg.VirtualChains = defaultConfig.VirtualChains
+func mergeWithDefaults(input []byte) (*Config, error) {
+	cfg := make(map[string]interface{})
+	if err := json.Unmarshal(input, cfg); err != nil {
+		return nil, err
 	}
 
-	if len(cfg.Endpoints) == 0 {
-		cfg.Endpoints = defaultConfig.Endpoints
+	rawDefaults, _ := json.Marshal(defaultConfig)
+	defaultCfg := make(map[string]interface{})
+	json.Unmarshal(rawDefaults, defaultCfg)
+
+	for k, v := range defaultCfg {
+		if _, found := cfg[k]; !found {
+			cfg[k] = v
+		}
 	}
 
-	if cfg.HttpAddress == "" {
-		cfg.HttpAddress = defaultConfig.HttpAddress
-	}
+	finalConfigRaw, _ := json.Marshal(cfg)
+	finalConfig := &Config{}
+	json.Unmarshal(finalConfigRaw, finalConfig)
 
-	if cfg.EndpointTimeoutMs == 0 {
-		cfg.EndpointTimeoutMs = defaultConfig.EndpointTimeoutMs
-	}
-
-	if cfg.RelayIntervalMs == 0 {
-		cfg.RelayIntervalMs = defaultConfig.RelayIntervalMs
-	}
-
-	if cfg.RelayBatchSize == 0 {
-		cfg.RelayBatchSize = defaultConfig.RelayBatchSize
-	}
-
-	return cfg, err
+	return finalConfig, nil
 }
