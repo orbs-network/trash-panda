@@ -16,6 +16,8 @@ import (
 )
 
 const GAMMA_ENDPOINT = "http://localhost:8080"
+const BAD_GAMMA_ENDPOINT = "http://localhost:111"
+const SECOND_BAD_GAMMA_ENDPOINT = "http://localhost:112"
 const GAMMA_VCHAIN = 42
 
 func contractTest(t *testing.T, f func(t *testing.T, endpoint string, vcid uint32)) {
@@ -35,10 +37,7 @@ func contractTest(t *testing.T, f func(t *testing.T, endpoint string, vcid uint3
 }
 
 func startTrashPanda(ctx context.Context, transport transport.Transport) string {
-	removeDB(GAMMA_VCHAIN)
-	httpAddress, endpoint := getRandomAddressAndEnpoint(GAMMA_VCHAIN)
-	bootstrap.NewTrashPanda(ctx, transport, &config.Config{
-		HttpAddress: httpAddress,
+	return startTrashPandaWithConfig(ctx, transport, &config.Config{
 		Endpoints: []string{
 			GAMMA_ENDPOINT,
 		},
@@ -48,6 +47,13 @@ func startTrashPanda(ctx context.Context, transport transport.Transport) string 
 		RelayBatchSize:  10,
 		Database:        "./",
 	})
+}
+
+func startTrashPandaWithConfig(ctx context.Context, transport transport.Transport, cfg *config.Config) string {
+	removeDB(GAMMA_VCHAIN)
+	httpAddress, endpoint := getRandomAddressAndEnpoint(GAMMA_VCHAIN)
+	cfg.HttpAddress = httpAddress
+	bootstrap.NewTrashPanda(ctx, transport, cfg)
 	return endpoint
 }
 

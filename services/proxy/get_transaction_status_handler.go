@@ -18,7 +18,7 @@ func getTransactionStatus(h *handler, data []byte) (input membuffers.Message, ou
 
 	shuffledEndpoints := h.getShuffledEndpoints()
 	response := filterResponsesByBlockHeight(aggregateRequest(REQUEST_ATTEMPTS, shuffledEndpoints, func(endpoint string) response {
-		res, resBody, e := h.transport.Send(shuffledEndpoints[0], h.path, data)
+		res, resBody, e := h.transport.Send(endpoint, h.path, data)
 		if e != nil {
 			return response{
 				httpErr: &HttpErr{http.StatusBadRequest, log.Error(e), e.Error()},

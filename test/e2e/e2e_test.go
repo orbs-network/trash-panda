@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/orbs-network/orbs-client-sdk-go/codec"
 	"github.com/orbs-network/orbs-client-sdk-go/orbs"
+	"github.com/orbs-network/trash-panda/config"
 	"github.com/orbs-network/trash-panda/transport"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -101,4 +102,37 @@ func Test_Relay(t *testing.T) {
 	txStatus, err := client.GetTransactionStatus(txId)
 	require.NoError(t, err)
 	require.EqualValues(t, codec.TRANSACTION_STATUS_COMMITTED, txStatus.TransactionStatus)
+}
+
+func Test_RunQueryWithMultipleEndpoints(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	httpTransport := transport.NewHttpTransport(transport.Config{
+		Timeout: 1 * time.Second,
+	})
+	endpoint := startTrashPandaWithConfig(ctx, httpTransport, &config.Config{
+		Endpoints: []string{
+			GAMMA_ENDPOINT,
+			BAD_GAMMA_ENDPOINT,
+			SECOND_BAD_GAMMA_ENDPOINT,
+		},
+		VirtualChains:   []uint32{GAMMA_VCHAIN},
+		Gamma:           true,
+		RelayIntervalMs: 100,
+		RelayBatchSize:  10,
+		Database:        "./",
+	})
+
+	account, _ := orbs.CreateAccount()
+	client := orbs.NewClient(endpoint, GAMMA_VCHAIN, codec.NETWORK_TYPE_TEST_NET)
+
+	query, err := client.CreateQuery(account.PublicKey, "_Info", "isAlive")
+	require.NoError(t, err)
+
+	res, err := client.SendQuery(query)
+	require.NoError(t, err)
+	require.EqualValues(t, res.RequestStatus, codec.REQUEST_STATUS_COMPLETED)
+	require.GreaterOrEqual(t, res.BlockHeight, uint64(1))
+
 }
