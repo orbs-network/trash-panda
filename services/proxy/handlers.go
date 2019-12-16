@@ -1,10 +1,12 @@
 package proxy
 
 import (
+	"github.com/orbs-network/govnr"
 	"github.com/orbs-network/membuffers/go"
 	"github.com/orbs-network/orbs-spec/types/go/protocol"
 	"github.com/orbs-network/orbs-spec/types/go/protocol/client"
 	"github.com/orbs-network/scribe/log"
+	"github.com/orbs-network/trash-panda/config"
 	"github.com/orbs-network/trash-panda/transport"
 	"math/rand"
 	"net/http"
@@ -145,18 +147,31 @@ func (s *service) findHandler(name string) Handler {
 
 const REQUEST_ATTEMPTS = 3
 
-func aggregateRequest(times int, endpoints []string, request func(endpoint string) response) []response {
+// FIXME introduce strict timeout
+func aggregateRequest(times int, endpoints []string, request func(endpoint string) response, logger log.Logger) []response {
 	var results []response
+	responseCh := make(chan response)
 
 	maxTimes := times
 	if maxTimes > len(endpoints) {
 		maxTimes = len(endpoints)
 	}
+
 	for i := 0; i < maxTimes; i++ {
-		results = append(results, request(endpoints[i]))
+		govnr.Once(config.NewErrorHandler(logger), wrapRequest(request, responseCh, endpoints[i]))
+	}
+
+	for i := 0; i < maxTimes; i++ {
+		results = append(results, <-responseCh)
 	}
 
 	return results
+}
+
+func wrapRequest(request func(endpoint string) response, responseCh chan response, endpoint string) func() {
+	return func() {
+		responseCh <- request(endpoint)
+	}
 }
 
 func filterResponses(responses []response, less func(i, j *client.RequestResult) bool) response {

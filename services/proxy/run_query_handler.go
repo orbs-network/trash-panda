@@ -37,6 +37,6 @@ func runQuery(h *handler, data []byte) (input membuffers.Message, output membuff
 			httpErr:       &HttpErr{Code: res.StatusCode},
 			requestResult: reader.RequestResult(),
 		}
-	}))
+	}, h.logger))
 	return input, response.output, response.httpErr
 }
