@@ -34,7 +34,8 @@ func NewTrashPanda(ctx context.Context, transport transport.Transport, cfg *conf
 }
 
 func buildProxyConfig(cfg *config.Config, vcid uint32) proxy.Config {
-	endpoints := cfg.Endpoints
+	endpoints := make([]string, len(cfg.Endpoints))
+	copy(endpoints, cfg.Endpoints)
 
 	if !cfg.Gamma {
 		for i, endpoint := range endpoints {
