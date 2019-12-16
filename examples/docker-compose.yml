@@ -14,5 +14,12 @@ services:
       - ./efs/trashpanda/db:/opt/orbs/db
       - ./trashpanda.config.json:/opt/orbs/config.json
 
-#  proxy:
-#    image: nginx
+  proxy:
+    image: nginx
+    command: nginx -c /etc/nginx.conf
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx.conf
+      - ./efs/letsencrypt/:/etc/letsencrypt/
