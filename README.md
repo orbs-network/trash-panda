@@ -1,5 +1,7 @@
 # Trash Panda
 
+![](./raccoon.png)
+
 Trash Panda is a proxy that allows to access Orbs network even if one of the nodes is down or the entire network is not advancing.
 
 From the SDK perspective, Trash Panda behaves just like the node.
