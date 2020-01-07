@@ -25,7 +25,7 @@ func getTransactionStatus(h *handler, data []byte) (input membuffers.Message, ou
 			}
 		}
 
-		if res.StatusCode != http.StatusOK {
+		if !(res.StatusCode == http.StatusOK || res.StatusCode == http.StatusNotFound) {
 			return response{
 				httpErr: &HttpErr{res.StatusCode, log.Error(errors.New(res.Status)), res.Header.Get("X-ORBS-ERROR-DETAILS")},
 			}
