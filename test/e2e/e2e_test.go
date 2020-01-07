@@ -102,6 +102,10 @@ func Test_Relay(t *testing.T) {
 	txStatus, err := client.GetTransactionStatus(txId)
 	require.NoError(t, err)
 	require.EqualValues(t, codec.TRANSACTION_STATUS_COMMITTED, txStatus.TransactionStatus)
+
+	notFound, err := client.GetTransactionStatus("0xC0058950d1Bdde15d06C2d7354C3Cb15Dae02CFC6BF5934b358D43dEf1DFE1a0C420Da72e541bd6e")
+	require.NoError(t, err)
+	require.EqualValues(t, codec.TRANSACTION_STATUS_NO_RECORD_FOUND, notFound.TransactionStatus)
 }
 
 func Test_RunQueryWithMultipleEndpoints(t *testing.T) {
