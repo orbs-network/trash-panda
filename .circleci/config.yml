@@ -1,0 +1,21 @@
+# Golang CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-go/ for more details
+version: 2
+jobs:
+  build:
+    machine:
+      image: ubuntu-1604:201903-01
+      docker_layer_caching: true
+    steps:
+      - checkout
+      - run: ./.circleci/install-go.sh
+      - run: ./.circleci/setup-gamma.sh
+      - run: go get -v -t -d ./...
+      - run: go test -v ./...
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build
