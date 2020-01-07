@@ -1,4 +1,5 @@
 # Trash Panda
+[![CircleCI](https://circleci.com/gh/orbs-network/trash-panda.svg?style=svg)](https://circleci.com/gh/orbs-network/trash-panda)
 
 ![](./raccoon.png)
 
